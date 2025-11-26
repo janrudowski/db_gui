@@ -438,6 +438,55 @@ impl DbConnection for MySqlConnection {
         Ok(())
     }
 
+    async fn alter_table(&self, params: AlterTableParams) -> DbResult<()> {
+        let table_name = format!("`{}`.`{}`", params.schema, params.table);
+
+        for change in params.changes {
+            let sql = match change.action {
+                ColumnChangeAction::Add => {
+                    let data_type = change.data_type.unwrap_or_else(|| "TEXT".to_string());
+                    let nullable = if change.is_nullable.unwrap_or(true) {
+                        ""
+                    } else {
+                        " NOT NULL"
+                    };
+                    let default = change
+                        .default_value
+                        .map(|d| format!(" DEFAULT {}", d))
+                        .unwrap_or_default();
+                    format!(
+                        "ALTER TABLE {} ADD COLUMN `{}` {}{}{}",
+                        table_name, change.column, data_type, nullable, default
+                    )
+                }
+                ColumnChangeAction::Drop => {
+                    format!("ALTER TABLE {} DROP COLUMN `{}`", table_name, change.column)
+                }
+                ColumnChangeAction::Rename => {
+                    let new_name = change.new_name.unwrap_or_else(|| change.column.clone());
+                    format!(
+                        "ALTER TABLE {} RENAME COLUMN `{}` TO `{}`",
+                        table_name, change.column, new_name
+                    )
+                }
+                ColumnChangeAction::Modify => {
+                    let data_type = change.data_type.unwrap_or_else(|| "TEXT".to_string());
+                    format!(
+                        "ALTER TABLE {} MODIFY COLUMN `{}` {}",
+                        table_name, change.column, data_type
+                    )
+                }
+            };
+
+            sqlx::query(&sql)
+                .execute(&self.pool)
+                .await
+                .map_err(|e| DbError::Query(e.to_string()))?;
+        }
+
+        Ok(())
+    }
+
     async fn close(&self) -> DbResult<()> {
         self.pool.close().await;
         Ok(())

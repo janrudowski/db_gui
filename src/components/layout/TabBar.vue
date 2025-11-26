@@ -1,7 +1,8 @@
 <script setup lang="ts">
   import { computed } from "vue"
   import draggable from "vuedraggable"
-  import type { Tab } from "../../types"
+  import type { Tab, TabType } from "../../types"
+  import { TAB_ICONS } from "../../types"
 
   const props = defineProps<{
     tabs: Tab[]
@@ -20,17 +21,8 @@
     set: (value) => emit("reorder", value),
   })
 
-  function getTabIcon(type: string): string {
-    switch (type) {
-      case "table":
-        return "pi pi-table"
-      case "query":
-        return "pi pi-code"
-      case "schema":
-        return "pi pi-database"
-      default:
-        return "pi pi-file"
-    }
+  function getTabIcon(type: TabType): { icon: string; color?: string } {
+    return TAB_ICONS[type] || { icon: "pi pi-file" }
   }
 </script>
 
@@ -46,11 +38,15 @@
       <template #item="{ element: tab }">
         <div
           class="tab"
-          :class="{ active: tab.id === activeTabId }"
+          :class="{ active: tab.id === activeTabId, dirty: tab.isDirty }"
           @click="emit('select', tab.id)"
         >
-          <i :class="getTabIcon(tab.type)" />
+          <i
+            :class="getTabIcon(tab.type).icon"
+            :style="{ color: getTabIcon(tab.type).color }"
+          />
           <span class="tab-title">{{ tab.title }}</span>
+          <span v-if="tab.isDirty" class="dirty-indicator">●</span>
           <button class="close-btn" @click.stop="emit('close', tab.id)">
             <i class="pi pi-times" />
           </button>
@@ -129,5 +125,15 @@
 
   .close-btn i {
     font-size: 0.7rem;
+  }
+
+  .dirty-indicator {
+    color: var(--p-orange-500);
+    font-size: 0.6rem;
+    margin-left: -4px;
+  }
+
+  .tab.dirty .tab-title {
+    font-style: italic;
   }
 </style>

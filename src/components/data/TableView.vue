@@ -12,6 +12,7 @@
     FilterCondition,
     RowUpdate,
     RowDelete,
+    RowInsert,
   } from "../../types"
 
   const props = defineProps<{
@@ -28,6 +29,8 @@
   const sortField = ref<string | null>(null)
   const sortOrder = ref<1 | -1 | 0>(0)
   const showFilterRow = ref(true)
+  const newRow = ref<Record<string, unknown> | null>(null)
+  const savingNewRow = ref(false)
 
   const PAGE_SIZE = 100
   const currentPage = ref(0)
@@ -252,6 +255,81 @@
     loadData()
   }
 
+  function startNewRow() {
+    if (!tableData.value) return
+    newRow.value = {}
+    for (const col of tableData.value.columns) {
+      newRow.value[col.name] = col.default_value || null
+    }
+    newRow.value.__isNew = true
+  }
+
+  function cancelNewRow() {
+    newRow.value = null
+  }
+
+  async function saveNewRow() {
+    if (!newRow.value || !tableData.value) return
+
+    const values: Record<string, unknown> = {}
+    for (const col of tableData.value.columns) {
+      const val = newRow.value[col.name]
+      if (val !== null && val !== undefined && val !== "") {
+        values[col.name] = val
+      }
+    }
+
+    if (Object.keys(values).length === 0) {
+      toast.add({
+        severity: "warn",
+        summary: "Empty row",
+        detail: "Please fill in at least one field",
+        life: 3000,
+      })
+      return
+    }
+
+    savingNewRow.value = true
+    try {
+      const insert: RowInsert = {
+        schema: props.schema,
+        table: props.table,
+        values,
+      }
+
+      await invoke("insert_row", {
+        connectionId: props.connectionId,
+        insert,
+      })
+
+      toast.add({
+        severity: "success",
+        summary: "Row inserted",
+        life: 2000,
+      })
+
+      newRow.value = null
+      loadData()
+    } catch (e) {
+      toast.add({
+        severity: "error",
+        summary: "Insert failed",
+        detail: String(e),
+        life: 5000,
+      })
+    } finally {
+      savingNewRow.value = false
+    }
+  }
+
+  const displayRows = computed(() => {
+    const result = [...rows.value]
+    if (newRow.value) {
+      result.unshift({ ...newRow.value, __rowIndex: -1 })
+    }
+    return result
+  })
+
   watch(
     () => [props.connectionId, props.schema, props.table],
     () => {
@@ -279,6 +357,15 @@
         >
       </span>
       <div class="toolbar-actions">
+        <Button
+          icon="pi pi-plus"
+          label="New Row"
+          size="small"
+          outlined
+          @click="startNewRow"
+          :disabled="!!newRow"
+          v-tooltip="'Insert new row'"
+        />
         <Button
           :icon="showFilterRow ? 'pi pi-filter-slash' : 'pi pi-filter'"
           text
@@ -319,12 +406,12 @@
     </div>
 
     <DataTable
-      :value="rows"
+      :value="displayRows"
       :loading="loading"
       scrollable
       scroll-height="flex"
       :virtualScrollerOptions="{ itemSize: 40 }"
-      :paginator="true"
+      :paginator="!newRow"
       :rows="PAGE_SIZE"
       :totalRecords="tableData?.total_count || 0"
       :lazy="true"
@@ -388,28 +475,51 @@
           </span>
         </template>
       </Column>
-      <Column header="Actions" frozen alignFrozen="right" style="width: 100px">
+      <Column header="Actions" frozen alignFrozen="right" style="width: 120px">
         <template #body="{ data }">
           <div class="row-actions">
-            <Button
-              v-if="hasChanges(data)"
-              icon="pi pi-check"
-              text
-              rounded
-              severity="success"
-              size="small"
-              @click="saveRow(data)"
-              v-tooltip="'Save changes'"
-            />
-            <Button
-              icon="pi pi-trash"
-              text
-              rounded
-              severity="danger"
-              size="small"
-              @click="deleteRow(data)"
-              v-tooltip="'Delete row'"
-            />
+            <template v-if="data.__isNew">
+              <Button
+                icon="pi pi-check"
+                text
+                rounded
+                severity="success"
+                size="small"
+                @click="saveNewRow"
+                :loading="savingNewRow"
+                v-tooltip="'Save new row'"
+              />
+              <Button
+                icon="pi pi-times"
+                text
+                rounded
+                severity="secondary"
+                size="small"
+                @click="cancelNewRow"
+                v-tooltip="'Cancel'"
+              />
+            </template>
+            <template v-else>
+              <Button
+                v-if="hasChanges(data)"
+                icon="pi pi-check"
+                text
+                rounded
+                severity="success"
+                size="small"
+                @click="saveRow(data)"
+                v-tooltip="'Save changes'"
+              />
+              <Button
+                icon="pi pi-trash"
+                text
+                rounded
+                severity="danger"
+                size="small"
+                @click="deleteRow(data)"
+                v-tooltip="'Delete row'"
+              />
+            </template>
           </div>
         </template>
       </Column>
@@ -500,5 +610,13 @@
   .row-actions {
     display: flex;
     gap: 2px;
+  }
+
+  :deep(.p-datatable-tbody tr:first-child.new-row) {
+    background: var(--p-green-50) !important;
+  }
+
+  :deep(.p-datatable-tbody tr:first-child.new-row td) {
+    border-color: var(--p-green-200);
   }
 </style>

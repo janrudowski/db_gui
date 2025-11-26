@@ -1,10 +1,22 @@
 <script setup lang="ts">
-  import { computed } from "vue"
+  import { computed, defineAsyncComponent, type Component } from "vue"
   import TabBar from "./TabBar.vue"
-  import TableView from "../data/TableView.vue"
-  import SqlEditor from "../editor/SqlEditor.vue"
-  import type { Pane, Tab } from "../../types"
+  import type { Pane, Tab, TabType } from "../../types"
   import { useWorkspaceStore } from "../../stores/workspace"
+
+  const TableView = defineAsyncComponent(() => import("../data/TableView.vue"))
+  const SqlEditor = defineAsyncComponent(
+    () => import("../editor/SqlEditor.vue")
+  )
+  const TableCreator = defineAsyncComponent(
+    () => import("../designer/TableCreator.vue")
+  )
+  const TableDesigner = defineAsyncComponent(
+    () => import("../designer/TableDesigner.vue")
+  )
+  const SchemaCreator = defineAsyncComponent(
+    () => import("../designer/SchemaCreator.vue")
+  )
 
   const props = defineProps<{
     pane: Pane
@@ -17,6 +29,54 @@
     return props.pane.tabs.find((t) => t.id === props.pane.activeTabId) || null
   })
 
+  const tabComponentMap: Record<TabType, Component> = {
+    "data-grid": TableView,
+    "sql-editor": SqlEditor,
+    "table-creator": TableCreator,
+    "table-designer": TableDesigner,
+    "schema-creator": SchemaCreator,
+  }
+
+  function getTabComponent(type: TabType): Component {
+    return tabComponentMap[type] || TableView
+  }
+
+  function getTabProps(tab: Tab): Record<string, unknown> {
+    const baseProps = {
+      connectionId: tab.connectionId,
+      tabId: tab.id,
+    }
+
+    switch (tab.type) {
+      case "data-grid":
+        return {
+          ...baseProps,
+          schema: tab.schema,
+          table: tab.table,
+        }
+      case "sql-editor":
+        return {
+          ...baseProps,
+          initialQuery: tab.query,
+        }
+      case "table-creator":
+        return {
+          ...baseProps,
+          schema: tab.schema,
+        }
+      case "table-designer":
+        return {
+          ...baseProps,
+          schema: tab.schema,
+          table: tab.table,
+        }
+      case "schema-creator":
+        return baseProps
+      default:
+        return baseProps
+    }
+  }
+
   function handleSelectTab(tabId: string) {
     workspaceStore.setActiveTab(props.pane.id, tabId)
   }
@@ -27,6 +87,10 @@
 
   function handleReorderTabs(tabs: Tab[]) {
     props.pane.tabs.splice(0, props.pane.tabs.length, ...tabs)
+  }
+
+  function handleTabSaved() {
+    workspaceStore.setTabDirty(activeTab.value?.id || "", false)
   }
 </script>
 
@@ -46,21 +110,16 @@
     />
 
     <div class="pane-content">
-      <template v-if="activeTab">
-        <TableView
-          v-if="activeTab.type === 'table'"
-          :connection-id="activeTab.connectionId"
-          :schema="activeTab.schema!"
-          :table="activeTab.table!"
+      <KeepAlive>
+        <component
+          v-if="activeTab"
+          :is="getTabComponent(activeTab.type)"
+          :key="activeTab.id"
+          v-bind="getTabProps(activeTab)"
+          @saved="handleTabSaved"
         />
-        <SqlEditor
-          v-else-if="activeTab.type === 'query'"
-          :connection-id="activeTab.connectionId"
-          :tab-id="activeTab.id"
-          :initial-query="activeTab.query"
-        />
-      </template>
-      <div v-else class="empty-pane">
+      </KeepAlive>
+      <div v-if="!activeTab" class="empty-pane">
         <i class="pi pi-inbox" />
         <p>No tabs open</p>
         <p class="hint"

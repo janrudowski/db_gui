@@ -107,6 +107,32 @@ pub struct RowDelete {
     pub primary_key_value: serde_json::Value,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum ColumnChangeAction {
+    Add,
+    Modify,
+    Drop,
+    Rename,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ColumnChange {
+    pub action: ColumnChangeAction,
+    pub column: String,
+    pub new_name: Option<String>,
+    pub data_type: Option<String>,
+    pub is_nullable: Option<bool>,
+    pub default_value: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AlterTableParams {
+    pub schema: String,
+    pub table: String,
+    pub changes: Vec<ColumnChange>,
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum DatabaseType {
@@ -175,6 +201,8 @@ pub trait DbConnection: Send + Sync {
     async fn drop_schema(&self, name: &str, cascade: bool) -> DbResult<()>;
 
     async fn drop_table(&self, schema: &str, table: &str, cascade: bool) -> DbResult<()>;
+
+    async fn alter_table(&self, params: AlterTableParams) -> DbResult<()>;
 
     async fn close(&self) -> DbResult<()>;
 }

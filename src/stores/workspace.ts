@@ -6,6 +6,14 @@ function generateId(): string {
   return Math.random().toString(36).substring(2, 9)
 }
 
+export interface OpenTabOptions {
+  schema?: string
+  table?: string
+  query?: string
+  metadata?: Record<string, unknown>
+  forceNew?: boolean
+}
+
 export const useWorkspaceStore = defineStore("workspace", () => {
   const panes = ref<Pane[]>([{ id: "main", tabs: [], activeTabId: null }])
   const activePaneId = ref<string>("main")
@@ -25,22 +33,24 @@ export const useWorkspaceStore = defineStore("workspace", () => {
     connectionId: string,
     type: TabType,
     title: string,
-    options?: { schema?: string; table?: string; query?: string }
-  ) {
+    options?: OpenTabOptions
+  ): string {
     const pane = activePane.value
-    if (!pane) return
+    if (!pane) return ""
 
-    const existingTab = pane.tabs.find(
-      (t) =>
-        t.connectionId === connectionId &&
-        t.type === type &&
-        t.schema === options?.schema &&
-        t.table === options?.table
-    )
+    if (!options?.forceNew) {
+      const existingTab = pane.tabs.find(
+        (t) =>
+          t.connectionId === connectionId &&
+          t.type === type &&
+          t.schema === options?.schema &&
+          t.table === options?.table
+      )
 
-    if (existingTab) {
-      pane.activeTabId = existingTab.id
-      return
+      if (existingTab) {
+        pane.activeTabId = existingTab.id
+        return existingTab.id
+      }
     }
 
     const tab: Tab = {
@@ -51,10 +61,13 @@ export const useWorkspaceStore = defineStore("workspace", () => {
       schema: options?.schema,
       table: options?.table,
       query: options?.query,
+      isDirty: false,
+      metadata: options?.metadata,
     }
 
     pane.tabs.push(tab)
     pane.activeTabId = tab.id
+    return tab.id
   }
 
   function closeTab(paneId: string, tabId: string) {
@@ -143,6 +156,44 @@ export const useWorkspaceStore = defineStore("workspace", () => {
     }
   }
 
+  function setTabDirty(tabId: string, isDirty: boolean) {
+    for (const pane of panes.value) {
+      const tab = pane.tabs.find((t) => t.id === tabId)
+      if (tab) {
+        tab.isDirty = isDirty
+        break
+      }
+    }
+  }
+
+  function updateTabMetadata(tabId: string, metadata: Record<string, unknown>) {
+    for (const pane of panes.value) {
+      const tab = pane.tabs.find((t) => t.id === tabId)
+      if (tab) {
+        tab.metadata = { ...tab.metadata, ...metadata }
+        break
+      }
+    }
+  }
+
+  function updateTabTitle(tabId: string, title: string) {
+    for (const pane of panes.value) {
+      const tab = pane.tabs.find((t) => t.id === tabId)
+      if (tab) {
+        tab.title = title
+        break
+      }
+    }
+  }
+
+  function getTabById(tabId: string): Tab | null {
+    for (const pane of panes.value) {
+      const tab = pane.tabs.find((t) => t.id === tabId)
+      if (tab) return tab
+    }
+    return null
+  }
+
   return {
     panes,
     activePaneId,
@@ -157,5 +208,9 @@ export const useWorkspaceStore = defineStore("workspace", () => {
     closePane,
     moveTab,
     updateTabQuery,
+    setTabDirty,
+    updateTabMetadata,
+    updateTabTitle,
+    getTabById,
   }
 })

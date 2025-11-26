@@ -408,6 +408,48 @@ impl DbConnection for SqliteConnection {
         Ok(())
     }
 
+    async fn alter_table(&self, params: AlterTableParams) -> DbResult<()> {
+        for change in params.changes {
+            match change.action {
+                ColumnChangeAction::Add => {
+                    let data_type = change.data_type.unwrap_or_else(|| "TEXT".to_string());
+                    let default = change
+                        .default_value
+                        .map(|d| format!(" DEFAULT {}", d))
+                        .unwrap_or_default();
+                    let sql = format!(
+                        "ALTER TABLE \"{}\" ADD COLUMN \"{}\" {}{}",
+                        params.table, change.column, data_type, default
+                    );
+                    sqlx::query(&sql)
+                        .execute(&self.pool)
+                        .await
+                        .map_err(|e| DbError::Query(e.to_string()))?;
+                }
+                ColumnChangeAction::Rename => {
+                    let new_name = change.new_name.unwrap_or_else(|| change.column.clone());
+                    let sql = format!(
+                        "ALTER TABLE \"{}\" RENAME COLUMN \"{}\" TO \"{}\"",
+                        params.table, change.column, new_name
+                    );
+                    sqlx::query(&sql)
+                        .execute(&self.pool)
+                        .await
+                        .map_err(|e| DbError::Query(e.to_string()))?;
+                }
+                ColumnChangeAction::Drop | ColumnChangeAction::Modify => {
+                    return Err(DbError::InvalidOperation(
+                        "SQLite does not support DROP COLUMN or MODIFY COLUMN. \
+                         You need to recreate the table."
+                            .to_string(),
+                    ));
+                }
+            }
+        }
+
+        Ok(())
+    }
+
     async fn close(&self) -> DbResult<()> {
         self.pool.close().await;
         Ok(())

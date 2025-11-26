@@ -3,9 +3,10 @@ mod connection;
 mod db;
 
 use commands::{
-    connect_to_database, create_schema, delete_connection, delete_row, disconnect_from_database,
-    drop_schema, drop_table, execute_query, get_columns, get_connections, get_schemas,
-    get_table_data, get_tables, insert_row, save_connection, test_connection, update_row, AppState,
+    alter_table, connect_to_database, create_schema, delete_connection, delete_row,
+    disconnect_from_database, drop_schema, drop_table, execute_query, get_columns, get_connections,
+    get_schemas, get_table_data, get_tables, insert_row, save_connection, test_connection,
+    update_row, AppState,
 };
 use tauri::Manager;
 
@@ -45,6 +46,7 @@ pub fn run() {
             create_schema,
             drop_schema,
             drop_table,
+            alter_table,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

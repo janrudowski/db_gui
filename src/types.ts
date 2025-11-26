@@ -109,7 +109,25 @@ export interface RowDelete {
   primary_key_value: unknown
 }
 
-export type TabType = "table" | "query" | "schema"
+export type TabType =
+  | "data-grid"
+  | "sql-editor"
+  | "table-creator"
+  | "table-designer"
+  | "schema-creator"
+
+export interface TabIcon {
+  icon: string
+  color?: string
+}
+
+export const TAB_ICONS: Record<TabType, TabIcon> = {
+  "data-grid": { icon: "pi pi-table", color: "var(--p-blue-500)" },
+  "sql-editor": { icon: "pi pi-code", color: "var(--p-green-500)" },
+  "table-creator": { icon: "pi pi-plus-circle", color: "var(--p-orange-500)" },
+  "table-designer": { icon: "pi pi-pencil", color: "var(--p-purple-500)" },
+  "schema-creator": { icon: "pi pi-database", color: "var(--p-cyan-500)" },
+}
 
 export interface Tab {
   id: string
@@ -119,10 +137,27 @@ export interface Tab {
   schema?: string
   table?: string
   query?: string
+  isDirty?: boolean
+  metadata?: Record<string, unknown>
 }
 
 export interface Pane {
   id: string
   tabs: Tab[]
   activeTabId: string | null
+}
+
+export interface ColumnChange {
+  action: "add" | "modify" | "drop" | "rename"
+  column: string
+  newName?: string
+  dataType?: string
+  isNullable?: boolean
+  defaultValue?: string | null
+}
+
+export interface AlterTableParams {
+  schema: string
+  table: string
+  changes: ColumnChange[]
 }

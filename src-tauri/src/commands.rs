@@ -1,7 +1,8 @@
 use crate::connection::{ConnectionStore, SavedConnection};
 use crate::db::{
-    ColumnInfo, ConnectionFactory, DatabaseType, DbConnection, FetchDataParams, FilterCondition,
-    QueryResult, RowDelete, RowInsert, RowUpdate, SchemaInfo, SortColumn, TableData, TableInfo,
+    AlterTableParams, ColumnInfo, ConnectionFactory, DatabaseType, DbConnection, FetchDataParams,
+    FilterCondition, QueryResult, RowDelete, RowInsert, RowUpdate, SchemaInfo, SortColumn,
+    TableData, TableInfo,
 };
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -298,4 +299,15 @@ pub async fn drop_table(
     conn.drop_table(&schema, &table, cascade)
         .await
         .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn alter_table(
+    state: State<'_, AppState>,
+    connection_id: String,
+    params: AlterTableParams,
+) -> Result<(), String> {
+    let active = state.active_connections.read().await;
+    let conn = active.get(&connection_id).ok_or("No active connection")?;
+    conn.alter_table(params).await.map_err(|e| e.to_string())
 }

@@ -11,8 +11,6 @@
   import type { TreeNode } from "primevue/treenode"
   import type { MenuItem } from "primevue/menuitem"
   import WorkspacePane from "../components/layout/WorkspacePane.vue"
-  import CreateTableDialog from "../components/schema/CreateTableDialog.vue"
-  import CreateSchemaDialog from "../components/schema/CreateSchemaDialog.vue"
   import DropConfirmDialog, {
     type DropAction,
   } from "../components/schema/DropConfirmDialog.vue"
@@ -32,8 +30,6 @@
   const contextMenuItems = ref<MenuItem[]>([])
   const selectedContextNode = ref<TreeNode | null>(null)
 
-  const showCreateTableDialog = ref(false)
-  const showCreateSchemaDialog = ref(false)
   const showDropDialog = ref(false)
   const dropAction = ref<DropAction>("drop_table")
   const dropSchema = ref("")
@@ -84,7 +80,7 @@
     if (node.data?.type === "table") {
       workspaceStore.openTab(
         props.id,
-        "table",
+        "data-grid",
         `${node.data.schema}.${node.data.name}`,
         { schema: node.data.schema, table: node.data.name }
       )
@@ -99,7 +95,7 @@
         {
           label: "New Table",
           icon: "pi pi-plus",
-          command: () => openCreateTableDialog(node.data.name),
+          command: () => openTableCreatorTab(node.data.name),
         },
         {
           label: "Refresh",
@@ -120,6 +116,11 @@
           label: "View Data",
           icon: "pi pi-table",
           command: () => onNodeSelect(node),
+        },
+        {
+          label: "Edit Table",
+          icon: "pi pi-pencil",
+          command: () => openTableDesignerTab(node.data.schema, node.data.name),
         },
         {
           label: "Query Table",
@@ -146,9 +147,27 @@
     contextMenu.value?.show(event)
   }
 
-  function openCreateTableDialog(schema: string) {
-    dropSchema.value = schema
-    showCreateTableDialog.value = true
+  function openTableCreatorTab(schema: string) {
+    workspaceStore.openTab(props.id, "table-creator", "New Table", {
+      schema,
+      forceNew: true,
+    })
+  }
+
+  function openTableDesignerTab(schema: string, table: string) {
+    workspaceStore.openTab(props.id, "table-designer", `Edit: ${table}`, {
+      schema,
+      table,
+    })
+  }
+
+  function openSchemaCreatorTab() {
+    workspaceStore.openTab(
+      props.id,
+      "schema-creator",
+      dbType.value === "mysql" ? "New Database" : "New Schema",
+      { forceNew: true }
+    )
   }
 
   function openDropDialog(action: DropAction, schema: string, table?: string) {
@@ -160,8 +179,9 @@
 
   function openQueryForTable(schema: string, table: string) {
     const q = dbType.value === "mysql" ? "`" : '"'
-    workspaceStore.openTab(props.id, "query", `Query ${table}`, {
+    workspaceStore.openTab(props.id, "sql-editor", `Query ${table}`, {
       query: `SELECT *\nFROM ${q}${schema}${q}.${q}${table}${q}\nLIMIT 100;`,
+      forceNew: true,
     })
   }
 
@@ -171,8 +191,9 @@
   }
 
   function openNewQuery() {
-    workspaceStore.openTab(props.id, "query", "New Query", {
+    workspaceStore.openTab(props.id, "sql-editor", "New Query", {
       query: "SELECT * FROM ",
+      forceNew: true,
     })
   }
 
@@ -182,17 +203,6 @@
       router.push({ name: "connections" })
     } catch (e) {
       console.error(e)
-    }
-  }
-
-  async function onSchemaCreated() {
-    await loadSchemas()
-  }
-
-  async function onTableCreated() {
-    const node = treeNodes.value.find((n) => n.data?.name === dropSchema.value)
-    if (node) {
-      await refreshSchema(node)
     }
   }
 
@@ -277,7 +287,7 @@
               text
               rounded
               size="small"
-              @click="showCreateSchemaDialog = true"
+              @click="openSchemaCreatorTab"
               v-tooltip.bottom="
                 dbType === 'mysql' ? 'New Database' : 'New Schema'
               "
@@ -331,21 +341,6 @@
         />
       </main>
     </div>
-
-    <CreateTableDialog
-      v-model:visible="showCreateTableDialog"
-      :connection-id="id"
-      :schema="dropSchema"
-      :db-type="dbType"
-      @created="onTableCreated"
-    />
-
-    <CreateSchemaDialog
-      v-model:visible="showCreateSchemaDialog"
-      :connection-id="id"
-      :db-type="dbType"
-      @created="onSchemaCreated"
-    />
 
     <DropConfirmDialog
       v-model:visible="showDropDialog"
