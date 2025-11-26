@@ -1,0 +1,504 @@
+<script setup lang="ts">
+  import { ref, onMounted, watch, computed } from "vue"
+  import { invoke } from "@tauri-apps/api/core"
+  import { useToast } from "primevue/usetoast"
+  import DataTable from "primevue/datatable"
+  import Column from "primevue/column"
+  import InputText from "primevue/inputtext"
+  import Button from "primevue/button"
+  import type {
+    TableData,
+    SortColumn,
+    FilterCondition,
+    RowUpdate,
+    RowDelete,
+  } from "../../types"
+
+  const props = defineProps<{
+    connectionId: string
+    schema: string
+    table: string
+  }>()
+
+  const toast = useToast()
+  const loading = ref(false)
+  const tableData = ref<TableData | null>(null)
+  const editingRows = ref<Record<string, Record<string, unknown>>>({})
+  const filters = ref<Record<string, string>>({})
+  const sortField = ref<string | null>(null)
+  const sortOrder = ref<1 | -1 | 0>(0)
+  const showFilterRow = ref(true)
+
+  const PAGE_SIZE = 100
+  const currentPage = ref(0)
+
+  const primaryKeyColumn = computed(() => {
+    return tableData.value?.columns.find((c) => c.is_primary_key)?.name || null
+  })
+
+  const rows = computed(() => {
+    if (!tableData.value) return []
+    return tableData.value.rows.map((row, index) => {
+      const obj: Record<string, unknown> = { __rowIndex: index }
+      tableData.value!.columns.forEach((col, colIndex) => {
+        obj[col.name] = row[colIndex]
+      })
+      return obj
+    })
+  })
+
+  const activeFilterCount = computed(() => {
+    return Object.values(filters.value).filter((v) => v.trim() !== "").length
+  })
+
+  function parseFilterValue(column: string, value: string): FilterCondition {
+    const trimmed = value.trim()
+
+    const rawPatterns = [
+      /^(>=?|<=?|<>|!=)\s*(.+)$/,
+      /^LIKE\s+(.+)$/i,
+      /^NOT\s+LIKE\s+(.+)$/i,
+      /^IN\s*\((.+)\)$/i,
+      /^NOT\s+IN\s*\((.+)\)$/i,
+      /^BETWEEN\s+(.+)\s+AND\s+(.+)$/i,
+      /^IS\s+NULL$/i,
+      /^IS\s+NOT\s+NULL$/i,
+    ]
+
+    for (const pattern of rawPatterns) {
+      if (pattern.test(trimmed)) {
+        return { column, operator: "raw", value: trimmed }
+      }
+    }
+
+    if (trimmed.startsWith("=")) {
+      return { column, operator: "equals", value: trimmed.substring(1).trim() }
+    }
+
+    return { column, operator: "contains", value: trimmed }
+  }
+
+  async function loadData() {
+    loading.value = true
+    try {
+      const sort: SortColumn[] | undefined = sortField.value
+        ? [
+            {
+              column: sortField.value,
+              direction: sortOrder.value === 1 ? "asc" : "desc",
+            },
+          ]
+        : undefined
+
+      const filterConditions: FilterCondition[] = Object.entries(filters.value)
+        .filter(([_, value]) => value.trim() !== "")
+        .map(([column, value]) => parseFilterValue(column, value))
+
+      tableData.value = await invoke<TableData>("get_table_data", {
+        connectionId: props.connectionId,
+        schema: props.schema,
+        table: props.table,
+        limit: PAGE_SIZE,
+        offset: currentPage.value * PAGE_SIZE,
+        sort: sort || null,
+        filters: filterConditions.length > 0 ? filterConditions : null,
+      })
+    } catch (e) {
+      toast.add({
+        severity: "error",
+        summary: "Error loading data",
+        detail: String(e),
+        life: 5000,
+      })
+    } finally {
+      loading.value = false
+    }
+  }
+
+  function onSort(event: any) {
+    if (event.sortField && typeof event.sortField === "string") {
+      sortField.value = event.sortField
+      sortOrder.value = (event.sortOrder || 0) as 1 | -1 | 0
+    } else {
+      sortField.value = null
+      sortOrder.value = 0
+    }
+    currentPage.value = 0
+    loadData()
+  }
+
+  function onPage(event: { page: number }) {
+    currentPage.value = event.page
+    loadData()
+  }
+
+  function onCellEditComplete(event: {
+    data: Record<string, unknown>
+    newValue: unknown
+    field: string
+  }) {
+    const { data, newValue, field } = event
+    if (data[field] === newValue) return
+
+    const rowKey = String(data.__rowIndex)
+    if (!editingRows.value[rowKey]) {
+      editingRows.value[rowKey] = {}
+    }
+    editingRows.value[rowKey][field] = newValue
+    data[field] = newValue
+  }
+
+  async function saveRow(rowData: Record<string, unknown>) {
+    if (!primaryKeyColumn.value) {
+      toast.add({
+        severity: "warn",
+        summary: "Cannot save",
+        detail: "Table has no primary key",
+        life: 3000,
+      })
+      return
+    }
+
+    const rowKey = String(rowData.__rowIndex)
+    const changes = editingRows.value[rowKey]
+    if (!changes || Object.keys(changes).length === 0) return
+
+    try {
+      const update: RowUpdate = {
+        schema: props.schema,
+        table: props.table,
+        primary_key_column: primaryKeyColumn.value,
+        primary_key_value: rowData[primaryKeyColumn.value],
+        updates: changes,
+      }
+
+      await invoke("update_row", {
+        connectionId: props.connectionId,
+        update,
+      })
+
+      delete editingRows.value[rowKey]
+      toast.add({
+        severity: "success",
+        summary: "Row updated",
+        life: 2000,
+      })
+    } catch (e) {
+      toast.add({
+        severity: "error",
+        summary: "Update failed",
+        detail: String(e),
+        life: 5000,
+      })
+    }
+  }
+
+  async function deleteRow(rowData: Record<string, unknown>) {
+    if (!primaryKeyColumn.value) {
+      toast.add({
+        severity: "warn",
+        summary: "Cannot delete",
+        detail: "Table has no primary key",
+        life: 3000,
+      })
+      return
+    }
+
+    try {
+      const deleteParams: RowDelete = {
+        schema: props.schema,
+        table: props.table,
+        primary_key_column: primaryKeyColumn.value,
+        primary_key_value: rowData[primaryKeyColumn.value],
+      }
+
+      await invoke("delete_row", {
+        connectionId: props.connectionId,
+        delete: deleteParams,
+      })
+
+      toast.add({
+        severity: "success",
+        summary: "Row deleted",
+        life: 2000,
+      })
+      loadData()
+    } catch (e) {
+      toast.add({
+        severity: "error",
+        summary: "Delete failed",
+        detail: String(e),
+        life: 5000,
+      })
+    }
+  }
+
+  function hasChanges(rowData: Record<string, unknown>): boolean {
+    const rowKey = String(rowData.__rowIndex)
+    return (
+      !!editingRows.value[rowKey] &&
+      Object.keys(editingRows.value[rowKey]).length > 0
+    )
+  }
+
+  function applyFilter() {
+    currentPage.value = 0
+    loadData()
+  }
+
+  function clearFilters() {
+    filters.value = {}
+    currentPage.value = 0
+    loadData()
+  }
+
+  watch(
+    () => [props.connectionId, props.schema, props.table],
+    () => {
+      currentPage.value = 0
+      filters.value = {}
+      sortField.value = null
+      sortOrder.value = 0
+      editingRows.value = {}
+      loadData()
+    },
+    { immediate: false }
+  )
+
+  onMounted(loadData)
+</script>
+
+<template>
+  <div class="table-view">
+    <div class="toolbar">
+      <span class="table-info">
+        <i class="pi pi-table" />
+        {{ schema }}.{{ table }}
+        <span v-if="tableData" class="row-count"
+          >({{ tableData.total_count }} rows)</span
+        >
+      </span>
+      <div class="toolbar-actions">
+        <Button
+          :icon="showFilterRow ? 'pi pi-filter-slash' : 'pi pi-filter'"
+          text
+          rounded
+          size="small"
+          @click="showFilterRow = !showFilterRow"
+          v-tooltip="showFilterRow ? 'Hide Filters' : 'Show Filters'"
+          :badge="activeFilterCount > 0 ? String(activeFilterCount) : undefined"
+        />
+        <Button
+          v-if="activeFilterCount > 0"
+          icon="pi pi-times"
+          text
+          rounded
+          size="small"
+          @click="clearFilters"
+          v-tooltip="'Clear Filters'"
+        />
+        <Button
+          icon="pi pi-refresh"
+          text
+          rounded
+          size="small"
+          @click="loadData"
+          :loading="loading"
+          v-tooltip="'Refresh'"
+        />
+      </div>
+    </div>
+
+    <div v-if="showFilterRow" class="filter-hint">
+      <i class="pi pi-info-circle" />
+      <span
+        >Filter syntax: <code>&gt; 100</code>, <code>LIKE '%test%'</code>,
+        <code>IS NULL</code>, <code>IN (1,2,3)</code>, or plain text for
+        contains</span
+      >
+    </div>
+
+    <DataTable
+      :value="rows"
+      :loading="loading"
+      scrollable
+      scroll-height="flex"
+      :virtualScrollerOptions="{ itemSize: 40 }"
+      :paginator="true"
+      :rows="PAGE_SIZE"
+      :totalRecords="tableData?.total_count || 0"
+      :lazy="true"
+      @page="onPage"
+      @sort="onSort"
+      :sortField="sortField || undefined"
+      :sortOrder="sortOrder"
+      editMode="cell"
+      @cell-edit-complete="onCellEditComplete"
+      class="data-grid"
+      stripedRows
+      showGridlines
+      size="small"
+    >
+      <Column
+        v-for="col in tableData?.columns"
+        :key="col.name"
+        :field="col.name"
+        :header="col.name"
+        :sortable="true"
+        style="min-width: 120px"
+      >
+        <template #header>
+          <div class="column-header">
+            <span class="column-name">
+              {{ col.name }}
+              <i
+                v-if="col.is_primary_key"
+                class="pi pi-key"
+                style="font-size: 0.7rem; color: var(--p-primary-color)"
+              />
+            </span>
+            <span class="column-type">{{ col.data_type }}</span>
+          </div>
+        </template>
+        <template #filter>
+          <InputText
+            v-model="filters[col.name]"
+            placeholder="Filter..."
+            size="small"
+            @keyup.enter="applyFilter"
+            style="width: 100%"
+          />
+        </template>
+        <template #editor="slotProps">
+          <InputText
+            v-model="slotProps.data[slotProps.field as string]"
+            autofocus
+            style="width: 100%"
+          />
+        </template>
+        <template #body="slotProps">
+          <span
+            :class="{ 'null-value': slotProps.data[slotProps.field as string] === null }"
+          >
+            {{
+              slotProps.data[slotProps.field as string] === null
+                ? "NULL"
+                : slotProps.data[slotProps.field as string]
+            }}
+          </span>
+        </template>
+      </Column>
+      <Column header="Actions" frozen alignFrozen="right" style="width: 100px">
+        <template #body="{ data }">
+          <div class="row-actions">
+            <Button
+              v-if="hasChanges(data)"
+              icon="pi pi-check"
+              text
+              rounded
+              severity="success"
+              size="small"
+              @click="saveRow(data)"
+              v-tooltip="'Save changes'"
+            />
+            <Button
+              icon="pi pi-trash"
+              text
+              rounded
+              severity="danger"
+              size="small"
+              @click="deleteRow(data)"
+              v-tooltip="'Delete row'"
+            />
+          </div>
+        </template>
+      </Column>
+    </DataTable>
+  </div>
+</template>
+
+<style scoped>
+  .table-view {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+  }
+
+  .toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.5rem 1rem;
+    background: var(--p-surface-100);
+    border-bottom: 1px solid var(--p-surface-200);
+  }
+
+  .toolbar-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+  }
+
+  .table-info {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-weight: 500;
+  }
+
+  .row-count {
+    color: var(--p-text-muted-color);
+    font-weight: normal;
+  }
+
+  .filter-hint {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.35rem 1rem;
+    background: var(--p-surface-50);
+    border-bottom: 1px solid var(--p-surface-200);
+    font-size: 0.75rem;
+    color: var(--p-text-muted-color);
+  }
+
+  .filter-hint code {
+    background: var(--p-surface-200);
+    padding: 0.1rem 0.3rem;
+    border-radius: 3px;
+    font-family: monospace;
+  }
+
+  .data-grid {
+    flex: 1;
+  }
+
+  .column-header {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  .column-name {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    font-weight: 600;
+  }
+
+  .column-type {
+    font-size: 0.75rem;
+    color: var(--p-text-muted-color);
+    font-weight: normal;
+  }
+
+  .null-value {
+    color: var(--p-text-muted-color);
+    font-style: italic;
+  }
+
+  .row-actions {
+    display: flex;
+    gap: 2px;
+  }
+</style>
