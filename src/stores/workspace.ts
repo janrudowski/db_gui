@@ -82,6 +82,10 @@ export const useWorkspaceStore = defineStore("workspace", () => {
     if (pane.activeTabId === tabId) {
       pane.activeTabId = pane.tabs[Math.max(0, tabIndex - 1)]?.id || null
     }
+
+    if (pane.tabs.length === 0 && panes.value.length > 1) {
+      closePane(paneId)
+    }
   }
 
   function closeOtherTabs(paneId: string, keepTabId: string) {
@@ -104,6 +108,10 @@ export const useWorkspaceStore = defineStore("workspace", () => {
 
     if (pane.activeTabId && !pane.tabs.find((t) => t.id === pane.activeTabId)) {
       pane.activeTabId = pane.tabs[0]?.id || null
+    }
+
+    if (pane.tabs.length === 0 && panes.value.length > 1) {
+      closePane(paneId)
     }
   }
 
@@ -145,35 +153,93 @@ export const useWorkspaceStore = defineStore("workspace", () => {
     pane.activeTabId = pane.tabs[prevIdx].id
   }
 
-  function reorderTabs(paneId: string, tabs: Tab[]) {
+  function setTabs(paneId: string, tabs: Tab[]) {
+    console.log("[WorkspaceStore] setTabs called", {
+      paneId,
+      incomingTabIds: tabs.map((t) => t.id),
+    })
     const pane = panes.value.find((p) => p.id === paneId)
-    if (pane) {
-      pane.tabs = tabs
+    if (!pane) {
+      console.log("[WorkspaceStore] setTabs: pane not found!")
+      return
     }
+
+    console.log("[WorkspaceStore] setTabs: before", {
+      currentTabIds: pane.tabs.map((t) => t.id),
+      activeTabId: pane.activeTabId,
+    })
+    pane.tabs = tabs
+    if (pane.activeTabId && !tabs.find((t) => t.id === pane.activeTabId)) {
+      console.log(
+        "[WorkspaceStore] setTabs: activeTabId no longer valid, resetting"
+      )
+      pane.activeTabId = tabs[0]?.id || null
+    }
+    console.log("[WorkspaceStore] setTabs: after", {
+      newTabIds: pane.tabs.map((t) => t.id),
+      activeTabId: pane.activeTabId,
+    })
+  }
+
+  function reorderTabs(paneId: string, tabs: Tab[]) {
+    console.log("[WorkspaceStore] reorderTabs called", { paneId })
+    setTabs(paneId, tabs)
   }
 
   function addTabToPane(paneId: string, tab: Tab, index: number) {
+    console.log("[WorkspaceStore] addTabToPane called", {
+      paneId,
+      tabId: tab.id,
+      index,
+    })
     const pane = panes.value.find((p) => p.id === paneId)
-    if (!pane) return
+    if (!pane) {
+      console.log("[WorkspaceStore] addTabToPane: pane not found!")
+      return
+    }
 
     const exists = pane.tabs.find((t) => t.id === tab.id)
-    if (exists) return
+    if (exists) {
+      console.log("[WorkspaceStore] addTabToPane: tab already exists!")
+      return
+    }
 
     pane.tabs.splice(index, 0, tab)
     pane.activeTabId = tab.id
+    console.log("[WorkspaceStore] addTabToPane: done", {
+      newTabIds: pane.tabs.map((t) => t.id),
+    })
   }
 
   function removeTabFromPane(paneId: string, tabId: string) {
+    console.log("[WorkspaceStore] removeTabFromPane called", { paneId, tabId })
     const pane = panes.value.find((p) => p.id === paneId)
-    if (!pane) return
+    if (!pane) {
+      console.log("[WorkspaceStore] removeTabFromPane: pane not found!")
+      return
+    }
 
     const idx = pane.tabs.findIndex((t) => t.id === tabId)
-    if (idx === -1) return
+    if (idx === -1) {
+      console.log("[WorkspaceStore] removeTabFromPane: tab not found!")
+      return
+    }
 
     pane.tabs.splice(idx, 1)
+    console.log(
+      "[WorkspaceStore] removeTabFromPane: removed tab, remaining:",
+      pane.tabs.map((t) => t.id)
+    )
 
     if (pane.activeTabId === tabId) {
       pane.activeTabId = pane.tabs[0]?.id || null
+    }
+
+    if (pane.tabs.length === 0 && panes.value.length > 1) {
+      console.log(
+        "[WorkspaceStore] removeTabFromPane: pane is empty, closing it"
+      )
+      closePane(paneId)
     }
   }
 
@@ -332,6 +398,7 @@ export const useWorkspaceStore = defineStore("workspace", () => {
     closeActiveTab,
     nextTab,
     previousTab,
+    setTabs,
     reorderTabs,
     addTabToPane,
     removeTabFromPane,

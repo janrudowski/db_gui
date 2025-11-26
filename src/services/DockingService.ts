@@ -44,20 +44,29 @@ export function useDockingService() {
   }
 
   function startDrag(tab: Tab, sourcePaneId: string) {
+    console.log("[DockingService] startDrag called", {
+      tab: tab.id,
+      sourcePaneId,
+    })
     dragState.isDragging = true
     dragState.draggedTab = tab
     dragState.sourcePaneId = sourcePaneId
     dragState.targetPaneId = null
     dragState.dropPosition = null
+    console.log("[DockingService] dragState after startDrag:", { ...dragState })
   }
 
   function endDrag() {
+    console.log("[DockingService] endDrag called, current state:", {
+      ...dragState,
+    })
     const result = {
       tab: dragState.draggedTab,
       sourcePaneId: dragState.sourcePaneId,
       targetPaneId: dragState.targetPaneId,
       dropPosition: dragState.dropPosition,
     }
+    console.log("[DockingService] endDrag result:", result)
 
     dragState.isDragging = false
     dragState.draggedTab = null
@@ -88,11 +97,22 @@ export function useDockingService() {
   }
 
   function handleDragOver(event: DragEvent, paneId: string): DockPosition {
-    if (!dragState.isDragging) return null
+    if (!dragState.isDragging) {
+      console.log(
+        "[DockingService] handleDragOver: isDragging is false, ignoring"
+      )
+      return null
+    }
 
     const position = calculateDropPosition(event.clientX, event.clientY, paneId)
     dragState.targetPaneId = paneId
     dragState.dropPosition = position
+    console.log("[DockingService] handleDragOver:", {
+      paneId,
+      position,
+      clientX: event.clientX,
+      clientY: event.clientY,
+    })
 
     return position
   }

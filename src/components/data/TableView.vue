@@ -1,5 +1,5 @@
 <script setup lang="ts">
-  import { ref, onMounted, watch, computed } from "vue"
+  import { ref, onMounted, onUnmounted, watch, computed } from "vue"
   import { invoke } from "@tauri-apps/api/core"
   import { useToast } from "primevue/usetoast"
   import DataTable from "primevue/datatable"
@@ -19,14 +19,17 @@
     RowDelete,
     RowInsert,
   } from "../../types"
+  import { useWorkspaceStore } from "../../stores/workspace"
 
   const props = defineProps<{
     connectionId: string
     schema: string
     table: string
+    tabId: string
   }>()
 
   const toast = useToast()
+  const workspaceStore = useWorkspaceStore()
   const loading = ref(false)
   const tableData = ref<TableData | null>(null)
   const editingRows = ref<Record<string, Record<string, unknown>>>({})
@@ -472,11 +475,56 @@
     { immediate: false }
   )
 
-  onMounted(loadData)
+  watch(
+    () => editingRows.value,
+    (newVal) => {
+      const isDirty = Object.keys(newVal).length > 0 || newRow.value !== null
+      workspaceStore.setTabDirty(props.tabId, isDirty)
+    },
+    { deep: true }
+  )
+
+  watch(
+    () => newRow.value,
+    (newVal) => {
+      const isDirty =
+        Object.keys(editingRows.value).length > 0 || newVal !== null
+      workspaceStore.setTabDirty(props.tabId, isDirty)
+    }
+  )
+
+  async function handleKeydown(e: KeyboardEvent) {
+    if ((e.ctrlKey || e.metaKey) && e.key === "s") {
+      e.preventDefault()
+      const editedRowKeys = Object.keys(editingRows.value)
+      if (editedRowKeys.length > 0) {
+        const promises = editedRowKeys.map((rowKey) => {
+          const row = displayRows.value.find(
+            (r) => String(r.__rowIndex) === rowKey
+          )
+          if (row) return saveRow(row)
+          return Promise.resolve()
+        })
+        await Promise.all(promises)
+      }
+      if (newRow.value) {
+        await saveNewRow()
+      }
+    }
+  }
+
+  onMounted(() => {
+    loadData()
+    window.addEventListener("keydown", handleKeydown)
+  })
+
+  onUnmounted(() => {
+    window.removeEventListener("keydown", handleKeydown)
+  })
 </script>
 
 <template>
-  <div class="table-view">
+  <div class="table-view" data-allow-context-menu="true">
     <div class="toolbar">
       <span class="table-info">
         <i class="pi pi-table" />

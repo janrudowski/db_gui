@@ -7,11 +7,14 @@
   ],
   "permissions": [
     "core:default",
+    "core:app:default",
+    "core:app:allow-default-window-icon",
     "opener:default",
     "stronghold:default",
     "core:menu:default",
     "core:tray:default",
     "core:image:default",
-    "core:window:default"
+    "core:window:default",
+    "dialog:default"
   ]
 }

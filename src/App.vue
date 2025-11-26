@@ -26,10 +26,14 @@
 </template>
 
 <style>
-  * {
+  *,
+  *::before,
+  *::after {
     margin: 0;
     padding: 0;
     box-sizing: border-box;
+    user-select: none !important;
+    -webkit-user-select: none !important;
   }
 
   html,
@@ -48,5 +52,18 @@
 
   html.dark-mode {
     color-scheme: dark;
+  }
+
+  input,
+  textarea,
+  [contenteditable="true"],
+  .monaco-editor,
+  .monaco-editor *,
+  .p-datatable-tbody td,
+  .p-datatable-tbody .cell-value,
+  pre,
+  code {
+    user-select: text !important;
+    -webkit-user-select: text !important;
   }
 </style>

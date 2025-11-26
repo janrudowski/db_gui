@@ -1,11 +1,12 @@
 <script setup lang="ts">
-  import { ref, computed, watch } from "vue"
+  import { ref, watch, computed } from "vue"
   import draggable from "vuedraggable"
   import ContextMenu from "primevue/contextmenu"
   import { useConfirm } from "primevue/useconfirm"
   import type { MenuItem } from "primevue/menuitem"
   import type { Tab, TabType } from "../../types"
   import { TAB_ICONS } from "../../types"
+  import { useWorkspaceStore } from "../../stores/workspace"
 
   interface DragChangeEvent {
     added?: { element: Tab; newIndex: number }
@@ -25,37 +26,92 @@
     (e: "close-others", tabId: string): void
     (e: "close-saved"): void
     (e: "close-to-right", tabId: string): void
-    (e: "reorder", tabs: Tab[]): void
     (e: "tab-added", tab: Tab, index: number): void
     (e: "tab-removed", tab: Tab): void
   }>()
 
+  const workspaceStore = useWorkspaceStore()
   const confirm = useConfirm()
   const contextMenu = ref<InstanceType<typeof ContextMenu> | null>(null)
   const contextTabId = ref<string | null>(null)
-  const dragging = ref(false)
-
   const localTabs = ref<Tab[]>([...props.tabs])
+  const isDragging = ref(false)
 
   watch(
     () => props.tabs,
-    (newTabs) => {
-      if (!dragging.value) {
+    (newTabs, oldTabs) => {
+      console.log("[TabBar] WATCH props.tabs changed", {
+        paneId: props.paneId,
+        isDragging: isDragging.value,
+        oldCount: oldTabs?.length,
+        newCount: newTabs.length,
+        newTabIds: newTabs.map((t) => t.id),
+      })
+      if (!isDragging.value) {
+        console.log("[TabBar] WATCH: Syncing localTabs from props")
         localTabs.value = [...newTabs]
+      } else {
+        console.log("[TabBar] WATCH: SKIPPING sync because isDragging=true")
       }
     },
     { deep: true }
   )
 
+  function onDragStart(event: any) {
+    console.log("[TabBar] onDragStart FIRED", {
+      paneId: props.paneId,
+      event,
+      localTabsBefore: localTabs.value.map((t) => t.id),
+    })
+    isDragging.value = true
+  }
+
+  function onDragEnd(event: any) {
+    console.log("[TabBar] onDragEnd FIRED", {
+      paneId: props.paneId,
+      event,
+      localTabsAfter: localTabs.value.map((t) => t.id),
+    })
+    isDragging.value = false
+    console.log(
+      "[TabBar] Calling workspaceStore.setTabs with:",
+      [...localTabs.value].map((t) => t.id)
+    )
+    workspaceStore.setTabs(props.paneId, [...localTabs.value])
+  }
+
   function handleDragChange(event: DragChangeEvent) {
+    console.log("[TabBar] handleDragChange FIRED", {
+      paneId: props.paneId,
+      event,
+      added: event.added,
+      removed: event.removed,
+      moved: event.moved,
+      localTabsNow: localTabs.value.map((t) => t.id),
+    })
     if (event.added) {
+      console.log(
+        "[TabBar] Tab ADDED from another pane:",
+        event.added.element.id,
+        "at index",
+        event.added.newIndex
+      )
       emit("tab-added", event.added.element, event.added.newIndex)
     }
     if (event.removed) {
+      console.log(
+        "[TabBar] Tab REMOVED to another pane:",
+        event.removed.element.id
+      )
       emit("tab-removed", event.removed.element)
     }
     if (event.moved) {
-      emit("reorder", [...localTabs.value])
+      console.log(
+        "[TabBar] Tab MOVED within pane from",
+        event.moved.oldIndex,
+        "to",
+        event.moved.newIndex
+      )
     }
   }
 
@@ -64,6 +120,8 @@
   }
 
   function onTabContextMenu(event: MouseEvent, tabId: string) {
+    event.preventDefault()
+    event.stopPropagation()
     contextTabId.value = tabId
     contextMenu.value?.show(event)
   }
@@ -164,22 +222,26 @@
 <template>
   <div class="tab-bar">
     <draggable
-      :list="localTabs"
+      v-model="localTabs"
+      tag="div"
       item-key="id"
       class="tab-list"
       group="workspace-tabs"
       ghost-class="ghost-tab"
+      drag-class="dragging-tab"
       :animation="150"
-      @start="dragging = true"
-      @end="dragging = false"
+      :force-fallback="true"
+      @start="onDragStart"
+      @end="onDragEnd"
       @change="handleDragChange"
     >
       <template #item="{ element: tab }">
         <div
           class="tab"
           :class="{ active: tab.id === activeTabId, dirty: tab.isDirty }"
+          data-allow-context-menu="true"
           @click="emit('select', tab.id)"
-          @contextmenu.prevent="onTabContextMenu($event, tab.id)"
+          @contextmenu="onTabContextMenu($event, tab.id)"
           @mousedown="onMiddleClick($event, tab.id)"
         >
           <i
@@ -223,10 +285,15 @@
     border: 1px solid var(--p-surface-200);
     border-bottom: none;
     border-radius: 6px 6px 0 0;
-    cursor: pointer;
+    cursor: grab;
     font-size: 0.85rem;
     white-space: nowrap;
     transition: background 0.15s;
+    -webkit-user-drag: element;
+  }
+
+  .tab:active {
+    cursor: grabbing;
   }
 
   .tab:hover {
@@ -282,5 +349,11 @@
   .ghost-tab {
     opacity: 0.5;
     background: var(--p-primary-100);
+  }
+
+  .dragging-tab {
+    opacity: 0.8;
+    background: var(--p-primary-200);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
   }
 </style>
