@@ -3,10 +3,11 @@ mod connection;
 mod db;
 
 use commands::{
-    alter_table, connect_to_database, create_schema, delete_connection, delete_row,
-    disconnect_from_database, drop_schema, drop_table, execute_query, get_columns, get_connections,
-    get_schemas, get_table_data, get_tables, insert_row, save_connection, test_connection,
-    update_row, AppState,
+    alter_table, begin_transaction, commit_transaction, connect_to_database, create_schema,
+    delete_connection, delete_row, disconnect_from_database, drop_schema, drop_table,
+    execute_query, export_data, get_columns, get_connections, get_distinct_values, get_schemas,
+    get_table_data, get_tables, get_transaction_status, insert_row, rollback_transaction,
+    save_connection, test_connection, update_row, AppState,
 };
 use tauri::Manager;
 
@@ -27,6 +28,7 @@ pub fn run() {
             Ok(())
         })
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_dialog::init())
         .manage(AppState::default())
         .invoke_handler(tauri::generate_handler![
             get_connections,
@@ -39,6 +41,7 @@ pub fn run() {
             get_tables,
             get_columns,
             get_table_data,
+            get_distinct_values,
             execute_query,
             update_row,
             insert_row,
@@ -47,6 +50,11 @@ pub fn run() {
             drop_schema,
             drop_table,
             alter_table,
+            export_data,
+            begin_transaction,
+            commit_transaction,
+            rollback_transaction,
+            get_transaction_status,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

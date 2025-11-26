@@ -9,6 +9,8 @@ import "primeicons/primeicons.css"
 
 import App from "./App.vue"
 import { router } from "./router"
+import { setupAppMenu } from "./utils/app-menu"
+import { setupSystemTray } from "./utils/system-tray"
 
 const app = createApp(App)
 const pinia = createPinia()
@@ -28,3 +30,6 @@ app.use(router)
 app.directive("tooltip", Tooltip)
 
 app.mount("#app")
+
+setupAppMenu().catch(console.error)
+setupSystemTray().catch(console.error)

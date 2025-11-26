@@ -3,10 +3,12 @@ use async_trait::async_trait;
 use sqlx::postgres::{PgConnectOptions, PgPool, PgPoolOptions, PgRow};
 use sqlx::{Column, Row};
 use std::str::FromStr;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::{Duration, Instant};
 
 pub struct PostgresConnection {
     pool: PgPool,
+    in_transaction: AtomicBool,
 }
 
 impl PostgresConnection {
@@ -22,7 +24,10 @@ impl PostgresConnection {
             .await
             .map_err(|e| DbError::Connection(e.to_string()))?;
 
-        Ok(Self { pool })
+        Ok(Self {
+            pool,
+            in_transaction: AtomicBool::new(false),
+        })
     }
 
     fn build_where_clause(&self, filters: &[FilterCondition]) -> (String, Vec<String>) {
@@ -403,41 +408,70 @@ impl DbConnection for PostgresConnection {
         }
     }
 
+    async fn get_distinct_values(
+        &self,
+        schema: &str,
+        table: &str,
+        column: &str,
+        limit: Option<u32>,
+    ) -> DbResult<Vec<serde_json::Value>> {
+        let limit_clause = limit.map(|l| format!(" LIMIT {}", l)).unwrap_or_default();
+        let sql = format!(
+            "SELECT DISTINCT \"{}\" FROM \"{}\".\"{}\" WHERE \"{}\" IS NOT NULL ORDER BY \"{}\"{}",
+            column, schema, table, column, column, limit_clause
+        );
+
+        let rows = sqlx::query(&sql)
+            .fetch_all(&self.pool)
+            .await
+            .map_err(|e| DbError::Query(e.to_string()))?;
+
+        let mut values = Vec::new();
+        for row in rows {
+            let val: Option<String> = row.try_get(0).ok();
+            if let Some(v) = val {
+                values.push(serde_json::Value::String(v));
+            }
+        }
+
+        Ok(values)
+    }
+
     async fn update_row(&self, update: RowUpdate) -> DbResult<u64> {
+        let format_value = |v: &serde_json::Value| -> String {
+            if v.is_null() {
+                "NULL".to_string()
+            } else if v.is_number() {
+                v.to_string()
+            } else if v.is_boolean() {
+                v.to_string()
+            } else if v.is_string() {
+                let s = v.as_str().unwrap();
+                format!("'{}'", s.replace('\'', "''"))
+            } else {
+                let s = v.to_string();
+                format!("'{}'", s.replace('\'', "''"))
+            }
+        };
+
         let set_clauses: Vec<String> = update
             .updates
-            .keys()
-            .enumerate()
-            .map(|(i, col)| format!("\"{}\" = ${}", col, i + 1))
+            .iter()
+            .map(|(col, val)| format!("\"{}\" = {}", col, format_value(val)))
             .collect();
 
+        let pk_formatted = format_value(&update.primary_key_value);
+
         let sql = format!(
-            "UPDATE \"{}\".\"{}\" SET {} WHERE \"{}\" = ${}",
+            "UPDATE \"{}\".\"{}\" SET {} WHERE \"{}\" = {}",
             update.schema,
             update.table,
             set_clauses.join(", "),
             update.primary_key_column,
-            update.updates.len() + 1
+            pk_formatted
         );
 
-        let bind_values: Vec<String> = update
-            .updates
-            .values()
-            .map(|v| v.to_string().trim_matches('"').to_string())
-            .collect();
-        let pk_value = update
-            .primary_key_value
-            .to_string()
-            .trim_matches('"')
-            .to_string();
-
-        let mut query = sqlx::query(&sql);
-        for value in &bind_values {
-            query = query.bind(value);
-        }
-        query = query.bind(&pk_value);
-
-        let result = query
+        let result = sqlx::query(&sql)
             .execute(&self.pool)
             .await
             .map_err(|e| DbError::Query(e.to_string()))?;
@@ -447,8 +481,25 @@ impl DbConnection for PostgresConnection {
 
     async fn insert_row(&self, insert: RowInsert) -> DbResult<serde_json::Value> {
         let columns: Vec<String> = insert.values.keys().map(|k| format!("\"{}\"", k)).collect();
-        let placeholders: Vec<String> = (1..=insert.values.len())
-            .map(|i| format!("${}", i))
+
+        let values: Vec<String> = insert
+            .values
+            .values()
+            .map(|v| {
+                if v.is_null() {
+                    "NULL".to_string()
+                } else if v.is_number() {
+                    v.to_string()
+                } else if v.is_boolean() {
+                    v.to_string()
+                } else if v.is_string() {
+                    let s = v.as_str().unwrap();
+                    format!("'{}'", s.replace('\'', "''"))
+                } else {
+                    let s = v.to_string();
+                    format!("'{}'", s.replace('\'', "''"))
+                }
+            })
             .collect();
 
         let sql = format!(
@@ -456,19 +507,10 @@ impl DbConnection for PostgresConnection {
             insert.schema,
             insert.table,
             columns.join(", "),
-            placeholders.join(", ")
+            values.join(", ")
         );
 
-        let bind_values: Vec<String> = insert
-            .values
-            .values()
-            .map(|v| v.to_string().trim_matches('"').to_string())
-            .collect();
-
-        let mut query = sqlx::query(&sql);
-        for value in &bind_values {
-            query = query.bind(value);
-        }
+        let query = sqlx::query(&sql);
 
         let row = query
             .fetch_one(&self.pool)
@@ -489,13 +531,24 @@ impl DbConnection for PostgresConnection {
     }
 
     async fn delete_row(&self, delete: RowDelete) -> DbResult<u64> {
+        let pk_formatted = if delete.primary_key_value.is_null() {
+            "NULL".to_string()
+        } else if delete.primary_key_value.is_number() {
+            delete.primary_key_value.to_string()
+        } else if delete.primary_key_value.is_string() {
+            let s = delete.primary_key_value.as_str().unwrap();
+            format!("'{}'", s.replace('\'', "''"))
+        } else {
+            let s = delete.primary_key_value.to_string();
+            format!("'{}'", s.replace('\'', "''"))
+        };
+
         let sql = format!(
-            "DELETE FROM \"{}\".\"{}\" WHERE \"{}\" = $1",
-            delete.schema, delete.table, delete.primary_key_column
+            "DELETE FROM \"{}\".\"{}\" WHERE \"{}\" = {}",
+            delete.schema, delete.table, delete.primary_key_column, pk_formatted
         );
 
         let result = sqlx::query(&sql)
-            .bind(delete.primary_key_value.to_string().trim_matches('"'))
             .execute(&self.pool)
             .await
             .map_err(|e| DbError::Query(e.to_string()))?;
@@ -588,6 +641,37 @@ impl DbConnection for PostgresConnection {
         }
 
         Ok(())
+    }
+
+    async fn begin_transaction(&self) -> DbResult<()> {
+        sqlx::query("BEGIN")
+            .execute(&self.pool)
+            .await
+            .map_err(|e| DbError::Query(e.to_string()))?;
+        self.in_transaction.store(true, Ordering::SeqCst);
+        Ok(())
+    }
+
+    async fn commit(&self) -> DbResult<()> {
+        sqlx::query("COMMIT")
+            .execute(&self.pool)
+            .await
+            .map_err(|e| DbError::Query(e.to_string()))?;
+        self.in_transaction.store(false, Ordering::SeqCst);
+        Ok(())
+    }
+
+    async fn rollback(&self) -> DbResult<()> {
+        sqlx::query("ROLLBACK")
+            .execute(&self.pool)
+            .await
+            .map_err(|e| DbError::Query(e.to_string()))?;
+        self.in_transaction.store(false, Ordering::SeqCst);
+        Ok(())
+    }
+
+    async fn in_transaction(&self) -> bool {
+        self.in_transaction.load(Ordering::SeqCst)
     }
 
     async fn close(&self) -> DbResult<()> {

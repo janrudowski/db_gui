@@ -1,6 +1,7 @@
 <script setup lang="ts">
   import { ref, onMounted, onUnmounted, computed } from "vue"
   import { useRouter } from "vue-router"
+  import { invoke } from "@tauri-apps/api/core"
   import { Splitpanes, Pane } from "splitpanes"
   import "splitpanes/dist/splitpanes.css"
   import Button from "primevue/button"
@@ -10,17 +11,34 @@
   import ContextMenu from "primevue/contextmenu"
   import type { TreeNode } from "primevue/treenode"
   import type { MenuItem } from "primevue/menuitem"
+  import TabView from "primevue/tabview"
+  import TabPanel from "primevue/tabpanel"
   import WorkspacePane from "../components/layout/WorkspacePane.vue"
+  import HistoryPanel from "../components/sidebar/HistoryPanel.vue"
   import DropConfirmDialog, {
     type DropAction,
   } from "../components/schema/DropConfirmDialog.vue"
   import { useConnectionsStore } from "../stores/connections"
   import { useWorkspaceStore } from "../stores/workspace"
+  import { useTransactionStore } from "../stores/transaction"
+  import { useToast } from "primevue/usetoast"
+  import ToggleSwitch from "primevue/toggleswitch"
+  import Tag from "primevue/tag"
+  import ThemeToggle from "../components/common/ThemeToggle.vue"
+  import {
+    generateSelect,
+    generateInsert,
+    generateUpdate,
+    generateDelete,
+    type DatabaseType as SqlDbType,
+  } from "../utils/sql-generator"
 
   const props = defineProps<{ id: string }>()
   const router = useRouter()
   const connectionsStore = useConnectionsStore()
   const workspaceStore = useWorkspaceStore()
+  const transactionStore = useTransactionStore()
+  const toast = useToast()
 
   const treeNodes = ref<TreeNode[]>([])
   const expandedKeys = ref<Record<string, boolean>>({})
@@ -111,6 +129,10 @@
         },
       ]
     } else if (node.data?.type === "table") {
+      const schema = node.data.schema
+      const table = node.data.name
+      const sqlDbType = (dbType.value || "postgres") as SqlDbType
+
       contextMenuItems.value = [
         {
           label: "View Data",
@@ -120,26 +142,70 @@
         {
           label: "Edit Table",
           icon: "pi pi-pencil",
-          command: () => openTableDesignerTab(node.data.schema, node.data.name),
+          command: () => openTableDesignerTab(schema, table),
+        },
+        { separator: true },
+        {
+          label: "Generate SQL",
+          icon: "pi pi-code",
+          items: [
+            {
+              label: "SELECT",
+              command: () =>
+                openGeneratedSql(schema, table, "select", sqlDbType),
+            },
+            {
+              label: "INSERT",
+              command: () =>
+                openGeneratedSql(schema, table, "insert", sqlDbType),
+            },
+            {
+              label: "UPDATE",
+              command: () =>
+                openGeneratedSql(schema, table, "update", sqlDbType),
+            },
+            {
+              label: "DELETE",
+              command: () =>
+                openGeneratedSql(schema, table, "delete", sqlDbType),
+            },
+          ],
         },
         {
-          label: "Query Table",
-          icon: "pi pi-code",
-          command: () => openQueryForTable(node.data.schema, node.data.name),
+          label: "Copy Name",
+          icon: "pi pi-copy",
+          command: () => copyToClipboard(`${schema}.${table}`),
         },
         { separator: true },
         {
           label: "Truncate Table",
           icon: "pi pi-eraser",
-          command: () =>
-            openDropDialog("truncate_table", node.data.schema, node.data.name),
+          command: () => openDropDialog("truncate_table", schema, table),
         },
         {
           label: "Drop Table",
           icon: "pi pi-trash",
           class: "p-menuitem-danger",
-          command: () =>
-            openDropDialog("drop_table", node.data.schema, node.data.name),
+          command: () => openDropDialog("drop_table", schema, table),
+        },
+      ]
+    } else if (node.data?.type === "column") {
+      const schema = node.data.schema
+      const table = node.data.table
+      const column = node.data.name
+
+      contextMenuItems.value = [
+        {
+          label: "Copy Name",
+          icon: "pi pi-copy",
+          command: () => copyToClipboard(column),
+        },
+        { separator: true },
+        {
+          label: "Drop Column",
+          icon: "pi pi-trash",
+          class: "p-menuitem-danger",
+          command: () => confirmDropColumn(schema, table, column),
         },
       ]
     }
@@ -177,12 +243,94 @@
     showDropDialog.value = true
   }
 
-  function openQueryForTable(schema: string, table: string) {
-    const q = dbType.value === "mysql" ? "`" : '"'
-    workspaceStore.openTab(props.id, "sql-editor", `Query ${table}`, {
-      query: `SELECT *\nFROM ${q}${schema}${q}.${q}${table}${q}\nLIMIT 100;`,
-      forceNew: true,
+  async function openGeneratedSql(
+    schema: string,
+    table: string,
+    type: "select" | "insert" | "update" | "delete",
+    sqlDbType: SqlDbType
+  ) {
+    const columns = await connectionsStore.getColumns(props.id, schema, table)
+    const colInfos = columns.map((c) => ({
+      name: c.name,
+      dataType: c.data_type,
+      isNullable: c.is_nullable,
+      defaultValue: c.default_value,
+    }))
+
+    let sql = ""
+    switch (type) {
+      case "select":
+        sql = generateSelect(schema, table, colInfos, sqlDbType)
+        break
+      case "insert":
+        sql = generateInsert(schema, table, colInfos, sqlDbType)
+        break
+      case "update":
+        sql = generateUpdate(schema, table, colInfos, sqlDbType)
+        break
+      case "delete":
+        sql = generateDelete(schema, table, sqlDbType)
+        break
+    }
+
+    workspaceStore.openTab(
+      props.id,
+      "sql-editor",
+      `${type.toUpperCase()} ${table}`,
+      {
+        query: sql,
+        forceNew: true,
+      }
+    )
+  }
+
+  function copyToClipboard(text: string) {
+    navigator.clipboard.writeText(text)
+    toast.add({
+      severity: "success",
+      summary: "Copied",
+      detail: `"${text}" copied to clipboard`,
+      life: 2000,
     })
+  }
+
+  async function confirmDropColumn(
+    schema: string,
+    table: string,
+    column: string
+  ) {
+    const confirm = window.confirm(
+      `Are you sure you want to drop column "${column}" from ${schema}.${table}?`
+    )
+    if (!confirm) return
+
+    try {
+      await invoke("alter_table", {
+        connectionId: props.id,
+        params: {
+          schema,
+          table,
+          changes: [{ action: "drop", column }],
+        },
+      })
+      toast.add({
+        severity: "success",
+        summary: "Column Dropped",
+        detail: `Column "${column}" was dropped`,
+        life: 3000,
+      })
+      const schemaNode = treeNodes.value.find((n) => n.data?.name === schema)
+      if (schemaNode) {
+        await refreshSchema(schemaNode)
+      }
+    } catch (e) {
+      toast.add({
+        severity: "error",
+        summary: "Failed to drop column",
+        detail: String(e),
+        life: 5000,
+      })
+    }
   }
 
   async function refreshSchema(node: TreeNode) {
@@ -219,9 +367,96 @@
     }
   }
 
-  onMounted(loadSchemas)
+  const inTransaction = computed(() =>
+    transactionStore.isInTransaction(props.id)
+  )
+
+  async function handleCommit() {
+    try {
+      await transactionStore.commit(props.id)
+      toast.add({
+        severity: "success",
+        summary: "Committed",
+        detail: "Transaction committed successfully",
+        life: 3000,
+      })
+    } catch (e) {
+      toast.add({
+        severity: "error",
+        summary: "Commit failed",
+        detail: String(e),
+        life: 5000,
+      })
+    }
+  }
+
+  async function handleRollback() {
+    try {
+      await transactionStore.rollback(props.id)
+      toast.add({
+        severity: "info",
+        summary: "Rolled back",
+        detail: "Transaction rolled back",
+        life: 3000,
+      })
+    } catch (e) {
+      toast.add({
+        severity: "error",
+        summary: "Rollback failed",
+        detail: String(e),
+        life: 5000,
+      })
+    }
+  }
+
+  async function toggleAutoCommit() {
+    transactionStore.toggleAutoCommit()
+    if (!transactionStore.autoCommit) {
+      try {
+        await transactionStore.beginTransaction(props.id)
+        toast.add({
+          severity: "info",
+          summary: "Transaction started",
+          detail: "Auto-commit disabled. Changes will be batched.",
+          life: 3000,
+        })
+      } catch (e) {
+        toast.add({
+          severity: "error",
+          summary: "Failed to start transaction",
+          detail: String(e),
+          life: 5000,
+        })
+        transactionStore.toggleAutoCommit()
+      }
+    } else if (inTransaction.value) {
+      await transactionStore.commit(props.id)
+    }
+  }
+
+  function handleKeydown(event: KeyboardEvent) {
+    const isMac = navigator.platform.toUpperCase().indexOf("MAC") >= 0
+    const modKey = isMac ? event.metaKey : event.ctrlKey
+
+    if (modKey && event.key === "w") {
+      event.preventDefault()
+      workspaceStore.closeActiveTab()
+    } else if (event.ctrlKey && event.key === "PageUp") {
+      event.preventDefault()
+      workspaceStore.previousTab()
+    } else if (event.ctrlKey && event.key === "PageDown") {
+      event.preventDefault()
+      workspaceStore.nextTab()
+    }
+  }
+
+  onMounted(() => {
+    loadSchemas()
+    window.addEventListener("keydown", handleKeydown)
+  })
 
   onUnmounted(async () => {
+    window.removeEventListener("keydown", handleKeydown)
     try {
       await connectionsStore.disconnect(props.id)
     } catch {
@@ -252,6 +487,42 @@
         </span>
       </div>
       <div class="header-actions">
+        <div class="transaction-controls">
+          <Tag
+            v-if="inTransaction"
+            severity="warn"
+            value="IN TRANSACTION"
+            class="transaction-tag"
+          />
+          <div class="auto-commit-toggle">
+            <label for="auto-commit">Auto-commit</label>
+            <ToggleSwitch
+              input-id="auto-commit"
+              :model-value="transactionStore.autoCommit"
+              @update:model-value="toggleAutoCommit"
+            />
+          </div>
+          <Button
+            v-if="inTransaction"
+            icon="pi pi-check"
+            label="Commit"
+            size="small"
+            severity="success"
+            @click="handleCommit"
+            :loading="transactionStore.loading"
+          />
+          <Button
+            v-if="inTransaction"
+            icon="pi pi-undo"
+            label="Rollback"
+            size="small"
+            severity="danger"
+            outlined
+            @click="handleRollback"
+            :loading="transactionStore.loading"
+          />
+        </div>
+        <div class="header-separator" />
         <Button
           icon="pi pi-code"
           label="New Query"
@@ -262,7 +533,9 @@
           icon="pi pi-columns"
           text
           rounded
-          @click="workspaceStore.splitPane('vertical')"
+          @click="
+            workspaceStore.splitPane(workspaceStore.activePaneId, 'right')
+          "
           v-tooltip="'Split Vertical'"
           :disabled="workspaceStore.panes.length >= 4"
         />
@@ -270,53 +543,72 @@
           icon="pi pi-arrows-h"
           text
           rounded
-          @click="workspaceStore.splitPane('horizontal')"
+          @click="
+            workspaceStore.splitPane(workspaceStore.activePaneId, 'bottom')
+          "
           v-tooltip="'Split Horizontal'"
           :disabled="workspaceStore.panes.length >= 4"
         />
+        <ThemeToggle />
       </div>
     </div>
 
     <div class="content">
       <aside class="sidebar">
-        <div class="sidebar-header">
-          <span>Database Explorer</span>
-          <div class="sidebar-actions">
-            <Button
-              icon="pi pi-plus"
-              text
-              rounded
-              size="small"
-              @click="openSchemaCreatorTab"
-              v-tooltip.bottom="
-                dbType === 'mysql' ? 'New Database' : 'New Schema'
-              "
-            />
-            <Button
-              icon="pi pi-refresh"
-              text
-              rounded
-              size="small"
-              @click="loadSchemas"
-              :loading="loading"
-              v-tooltip.bottom="'Refresh'"
-            />
-          </div>
-        </div>
-        <ProgressSpinner
-          v-if="loading"
-          style="width: 30px; height: 30px; margin: 1rem auto"
-        />
-        <Tree
-          v-else
-          :value="treeNodes"
-          v-model:expandedKeys="expandedKeys"
-          selectionMode="single"
-          @node-expand="onNodeExpand"
-          @node-select="onNodeSelect"
-          @node-contextmenu="(e: any) => onNodeContextMenu(e.originalEvent, e.node)"
-          class="schema-tree"
-        />
+        <TabView class="sidebar-tabs">
+          <TabPanel value="explorer">
+            <template #header>
+              <i class="pi pi-database" style="margin-right: 0.35rem" />
+              <span>Explorer</span>
+            </template>
+            <div class="sidebar-panel">
+              <div class="sidebar-header">
+                <div class="sidebar-actions">
+                  <Button
+                    icon="pi pi-plus"
+                    text
+                    rounded
+                    size="small"
+                    @click="openSchemaCreatorTab"
+                    v-tooltip.bottom="
+                      dbType === 'mysql' ? 'New Database' : 'New Schema'
+                    "
+                  />
+                  <Button
+                    icon="pi pi-refresh"
+                    text
+                    rounded
+                    size="small"
+                    @click="loadSchemas"
+                    :loading="loading"
+                    v-tooltip.bottom="'Refresh'"
+                  />
+                </div>
+              </div>
+              <ProgressSpinner
+                v-if="loading"
+                style="width: 30px; height: 30px; margin: 1rem auto"
+              />
+              <Tree
+                v-else
+                :value="treeNodes"
+                v-model:expandedKeys="expandedKeys"
+                selectionMode="single"
+                @node-expand="onNodeExpand"
+                @node-select="onNodeSelect"
+                @node-contextmenu="(e: any) => onNodeContextMenu(e.originalEvent, e.node)"
+                class="schema-tree"
+              />
+            </div>
+          </TabPanel>
+          <TabPanel value="history">
+            <template #header>
+              <i class="pi pi-history" style="margin-right: 0.35rem" />
+              <span>History</span>
+            </template>
+            <HistoryPanel :connection-id="id" />
+          </TabPanel>
+        </TabView>
       </aside>
 
       <ContextMenu ref="contextMenu" :model="contextMenuItems" />
@@ -393,6 +685,30 @@
     margin-left: auto;
   }
 
+  .transaction-controls {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+  }
+
+  .transaction-tag {
+    font-size: 0.7rem;
+  }
+
+  .auto-commit-toggle {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.85rem;
+  }
+
+  .header-separator {
+    width: 1px;
+    height: 24px;
+    background: var(--p-surface-300);
+    margin: 0 0.5rem;
+  }
+
   .content {
     display: flex;
     flex: 1;
@@ -408,13 +724,45 @@
     overflow: hidden;
   }
 
+  .sidebar-tabs {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+  }
+
+  :deep(.sidebar-tabs .p-tabview-panels) {
+    flex: 1;
+    overflow: hidden;
+    padding: 0;
+  }
+
+  :deep(.sidebar-tabs .p-tabview-panel) {
+    height: 100%;
+    overflow: auto;
+  }
+
+  :deep(.sidebar-tabs .p-tabview-nav) {
+    background: var(--p-surface-50);
+    border-bottom: 1px solid var(--p-surface-200);
+  }
+
+  :deep(.sidebar-tabs .p-tabview-nav-link) {
+    padding: 0.5rem 0.75rem;
+    font-size: 0.85rem;
+  }
+
+  .sidebar-panel {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+  }
+
   .sidebar-header {
     display: flex;
     align-items: center;
-    justify-content: space-between;
-    padding: 0.75rem 1rem;
-    font-weight: 600;
-    border-bottom: 1px solid var(--p-surface-200);
+    justify-content: flex-end;
+    padding: 0.5rem 0.75rem;
+    border-bottom: 1px solid var(--p-surface-100);
   }
 
   .sidebar-actions {

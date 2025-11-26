@@ -1,15 +1,27 @@
 <script setup lang="ts">
-  import { ref, onMounted, onUnmounted, shallowRef } from "vue"
+  import {
+    ref,
+    onMounted,
+    onUnmounted,
+    shallowRef,
+    computed,
+    nextTick,
+  } from "vue"
   import { invoke } from "@tauri-apps/api/core"
   import { useToast } from "primevue/usetoast"
+  import { Splitpanes, Pane } from "splitpanes"
+  import "splitpanes/dist/splitpanes.css"
   import Button from "primevue/button"
-  import DataTable from "primevue/datatable"
-  import Column from "primevue/column"
   import * as monaco from "monaco-editor"
   import { format } from "sql-formatter"
   import type { QueryResult } from "../../types"
+  import DataGrid, {
+    type GridColumn,
+    type LazyLoadEvent,
+  } from "../common/DataGrid.vue"
   import { useWorkspaceStore } from "../../stores/workspace"
   import { useConnectionsStore } from "../../stores/connections"
+  import { useHistoryStore } from "../../stores/history"
   import {
     configureMonacoDefaults,
     getEditorOptions,
@@ -26,17 +38,31 @@
   const toast = useToast()
   const workspaceStore = useWorkspaceStore()
   const connectionsStore = useConnectionsStore()
+  const historyStore = useHistoryStore()
 
   const editorContainer = ref<HTMLElement | null>(null)
   const editorInstance = shallowRef<monaco.editor.IStandaloneCodeEditor | null>(
     null
   )
   const completionDisposable = shallowRef<monaco.IDisposable | null>(null)
+  const dataGridRef = ref<InstanceType<typeof DataGrid> | null>(null)
 
   const loading = ref(false)
   const result = ref<QueryResult | null>(null)
   const error = ref<string | null>(null)
+  const currentQuery = ref("")
+  const CHUNK_SIZE = 50
   const resultRows = ref<Record<string, unknown>[]>([])
+  const loadedChunks = ref<Set<number>>(new Set())
+
+  const gridColumns = computed<GridColumn[]>(() => {
+    if (!result.value) return []
+    return result.value.columns.map((col) => ({
+      name: col,
+      dataType: undefined,
+      isPrimaryKey: false,
+    }))
+  })
 
   function buildSchemaMetadata(): SchemaMetadata {
     const schemas = connectionsStore.getSchemas(props.connectionId)
@@ -114,6 +140,7 @@
     loading.value = true
     error.value = null
     result.value = null
+    const startTime = Date.now()
 
     try {
       result.value = await invoke<QueryResult>("execute_query", {
@@ -121,13 +148,28 @@
         sql: query,
       })
 
+      const duration = Date.now() - startTime
+
+      currentQuery.value = query
+      loadedChunks.value.clear()
+
       resultRows.value = result.value.rows.map((row) => {
-        const obj: Record<string, unknown> = {}
+        const obj: Record<string, unknown> = { __loaded: true }
         result.value!.columns.forEach((col, i) => {
           obj[col] = row[i]
         })
         return obj
       })
+
+      dataGridRef.value?.resetLoadedRanges()
+
+      historyStore.addEntry(
+        query,
+        props.connectionId,
+        "success",
+        duration,
+        result.value.rows_affected
+      )
 
       toast.add({
         severity: "success",
@@ -136,7 +178,18 @@
         life: 3000,
       })
     } catch (e) {
+      const duration = Date.now() - startTime
       error.value = String(e)
+
+      historyStore.addEntry(
+        query,
+        props.connectionId,
+        "error",
+        duration,
+        undefined,
+        String(e)
+      )
+
       toast.add({
         severity: "error",
         summary: "Query failed",
@@ -175,6 +228,48 @@
       })
     }
   }
+
+  async function onLazyLoad(event: LazyLoadEvent) {
+    if (!currentQuery.value || loading.value) return
+
+    const chunkStart = Math.floor(event.first / CHUNK_SIZE) * CHUNK_SIZE
+    if (loadedChunks.value.has(chunkStart)) return
+
+    loadedChunks.value.add(chunkStart)
+
+    try {
+      const chunkResult = await invoke<QueryResult>("execute_query", {
+        connectionId: props.connectionId,
+        sql: currentQuery.value,
+        limit: CHUNK_SIZE,
+        offset: chunkStart,
+      })
+
+      const newRows = chunkResult.rows.map((row) => {
+        const obj: Record<string, unknown> = { __loaded: true }
+        chunkResult.columns.forEach((col, i) => {
+          obj[col] = row[i]
+        })
+        return obj
+      })
+
+      for (let i = 0; i < newRows.length; i++) {
+        if (chunkStart + i < resultRows.value.length) {
+          resultRows.value[chunkStart + i] = newRows[i]
+        } else {
+          resultRows.value.push(newRows[i])
+        }
+      }
+    } catch (e) {
+      console.error("Lazy load failed:", e)
+    }
+  }
+
+  function handlePaneResize() {
+    nextTick(() => {
+      editorInstance.value?.layout()
+    })
+  }
 </script>
 
 <template>
@@ -204,53 +299,43 @@
       </span>
     </div>
 
-    <div class="editor-container" ref="editorContainer" />
-
-    <div class="results-panel">
-      <div v-if="error" class="error-message">
-        <i class="pi pi-exclamation-triangle" />
-        {{ error }}
-      </div>
-      <DataTable
-        v-else-if="result && result.columns.length > 0"
-        :value="resultRows"
-        scrollable
-        scroll-height="flex"
-        stripedRows
-        showGridlines
-        size="small"
-        class="results-table"
-      >
-        <Column
-          v-for="col in result.columns"
-          :key="col"
-          :field="col"
-          :header="col"
-          style="min-width: 100px"
-        >
-          <template #body="slotProps">
-            <span
-              :class="{ 'null-value': slotProps.data[slotProps.field as string] === null }"
-            >
-              {{
-                slotProps.data[slotProps.field as string] === null
-                  ? "NULL"
-                  : slotProps.data[slotProps.field as string]
-              }}
-            </span>
-          </template>
-        </Column>
-      </DataTable>
-      <div v-else-if="result" class="no-results">
-        <i class="pi pi-check-circle" />
-        <p>Query executed successfully</p>
-        <p class="detail">{{ result.rows_affected }} rows affected</p>
-      </div>
-      <div v-else class="placeholder">
-        <i class="pi pi-database" />
-        <p>Execute a query to see results</p>
-      </div>
-    </div>
+    <Splitpanes
+      horizontal
+      class="default-theme split-content"
+      @resize="handlePaneResize"
+    >
+      <Pane :size="50" :min-size="20">
+        <div class="editor-container" ref="editorContainer" />
+      </Pane>
+      <Pane :size="50" :min-size="20">
+        <div class="results-panel">
+          <div v-if="error" class="error-message">
+            <i class="pi pi-exclamation-triangle" />
+            {{ error }}
+          </div>
+          <DataGrid
+            v-else-if="result && result.columns.length > 0"
+            ref="dataGridRef"
+            :rows="resultRows"
+            :columns="gridColumns"
+            :loading="loading"
+            :total-records="resultRows.length"
+            :paginator="false"
+            virtual-scroll
+            @lazy-load="onLazyLoad"
+          />
+          <div v-else-if="result" class="no-results">
+            <i class="pi pi-check-circle" />
+            <p>Query executed successfully</p>
+            <p class="detail">{{ result.rows_affected }} rows affected</p>
+          </div>
+          <div v-else class="placeholder">
+            <i class="pi pi-database" />
+            <p>Execute a query to see results</p>
+          </div>
+        </div>
+      </Pane>
+    </Splitpanes>
   </div>
 </template>
 
@@ -285,24 +370,21 @@
     border-radius: 4px;
   }
 
-  .editor-container {
+  .split-content {
     flex: 1;
-    min-height: 150px;
-    max-height: 50%;
     overflow: hidden;
-    border-bottom: 1px solid var(--p-surface-200);
+  }
+
+  .editor-container {
+    height: 100%;
+    overflow: hidden;
   }
 
   .results-panel {
-    flex: 1;
-    min-height: 100px;
+    height: 100%;
     overflow: hidden;
     display: flex;
     flex-direction: column;
-  }
-
-  .results-table {
-    flex: 1;
   }
 
   .error-message {
@@ -345,8 +427,8 @@
     opacity: 0.7;
   }
 
-  .null-value {
+  .rows-info {
+    font-size: 0.8rem;
     color: var(--p-text-muted-color);
-    font-style: italic;
   }
 </style>

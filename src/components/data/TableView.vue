@@ -6,6 +6,11 @@
   import Column from "primevue/column"
   import InputText from "primevue/inputtext"
   import Button from "primevue/button"
+  import ExportDialog from "../export/ExportDialog.vue"
+  import ValueInspector from "../common/ValueInspector.vue"
+  import ColumnFilter, {
+    type ColumnFilterValue,
+  } from "../common/ColumnFilter.vue"
   import type {
     TableData,
     SortColumn,
@@ -31,9 +36,17 @@
   const showFilterRow = ref(true)
   const newRow = ref<Record<string, unknown> | null>(null)
   const savingNewRow = ref(false)
+  const showExportDialog = ref(false)
+  const showValueInspector = ref(false)
+  const inspectorValue = ref<unknown>(null)
+  const inspectorColumn = ref("")
+  const inspectorColumnType = ref("")
+  const inspectorRowData = ref<Record<string, unknown> | null>(null)
 
   const PAGE_SIZE = 100
   const currentPage = ref(0)
+  const serverFilters = ref<Record<string, ColumnFilterValue>>({})
+  const dataTableRef = ref<InstanceType<typeof DataTable> | null>(null)
 
   const primaryKeyColumn = computed(() => {
     return tableData.value?.columns.find((c) => c.is_primary_key)?.name || null
@@ -50,9 +63,21 @@
     })
   })
 
+  const displayRows = computed(() => {
+    const result = [...rows.value]
+    if (newRow.value) {
+      result.unshift({ ...newRow.value, __rowIndex: -1 })
+    }
+    return result
+  })
+
   const activeFilterCount = computed(() => {
     return Object.values(filters.value).filter((v) => v.trim() !== "").length
   })
+
+  const virtualScrollerOptions = computed(() => ({
+    itemSize: 40,
+  }))
 
   function parseFilterValue(column: string, value: string): FilterCondition {
     const trimmed = value.trim()
@@ -81,6 +106,63 @@
     return { column, operator: "contains", value: trimmed }
   }
 
+  function convertServerFilter(
+    filter: ColumnFilterValue
+  ): FilterCondition | null {
+    const { column, operator, value } = filter
+
+    switch (operator) {
+      case "in":
+        if (Array.isArray(value) && value.length > 0) {
+          const inList = value
+            .map((v) => `'${String(v).replace(/'/g, "''")}'`)
+            .join(",")
+          return { column, operator: "raw", value: `IN (${inList})` }
+        }
+        return null
+      case "contains":
+        return { column, operator: "contains", value: String(value) }
+      case "equals":
+        return { column, operator: "equals", value: String(value) }
+      case "notEquals":
+        return {
+          column,
+          operator: "raw",
+          value: `<> '${String(value).replace(/'/g, "''")}'`,
+        }
+      case "startsWith":
+        return {
+          column,
+          operator: "raw",
+          value: `LIKE '${String(value).replace(/'/g, "''")}%'`,
+        }
+      case "endsWith":
+        return {
+          column,
+          operator: "raw",
+          value: `LIKE '%${String(value).replace(/'/g, "''")}'`,
+        }
+      case "gt":
+        return {
+          column,
+          operator: "raw",
+          value: `> '${String(value).replace(/'/g, "''")}'`,
+        }
+      case "lt":
+        return {
+          column,
+          operator: "raw",
+          value: `< '${String(value).replace(/'/g, "''")}'`,
+        }
+      case "isNull":
+        return { column, operator: "raw", value: "IS NULL" }
+      case "isNotNull":
+        return { column, operator: "raw", value: "IS NOT NULL" }
+      default:
+        return null
+    }
+  }
+
   async function loadData() {
     loading.value = true
     try {
@@ -97,6 +179,14 @@
         .filter(([_, value]) => value.trim() !== "")
         .map(([column, value]) => parseFilterValue(column, value))
 
+      const serverFilterConditions: FilterCondition[] = Object.values(
+        serverFilters.value
+      )
+        .map((f) => convertServerFilter(f))
+        .filter((f): f is FilterCondition => f !== null)
+
+      const allFilters = [...filterConditions, ...serverFilterConditions]
+
       tableData.value = await invoke<TableData>("get_table_data", {
         connectionId: props.connectionId,
         schema: props.schema,
@@ -104,7 +194,7 @@
         limit: PAGE_SIZE,
         offset: currentPage.value * PAGE_SIZE,
         sort: sort || null,
-        filters: filterConditions.length > 0 ? filterConditions : null,
+        filters: allFilters.length > 0 ? allFilters : null,
       })
     } catch (e) {
       toast.add({
@@ -118,7 +208,15 @@
     }
   }
 
-  function onSort(event: any) {
+  function onPage(event: { page: number }) {
+    currentPage.value = event.page
+    loadData()
+  }
+
+  function onServerSort(event: {
+    sortField?: string | ((item: unknown) => string)
+    sortOrder?: number | null
+  }) {
     if (event.sortField && typeof event.sortField === "string") {
       sortField.value = event.sortField
       sortOrder.value = (event.sortOrder || 0) as 1 | -1 | 0
@@ -130,8 +228,11 @@
     loadData()
   }
 
-  function onPage(event: { page: number }) {
-    currentPage.value = event.page
+  function onServerFilter(event: {
+    filters: Record<string, ColumnFilterValue>
+  }) {
+    serverFilters.value = event.filters
+    currentPage.value = 0
     loadData()
   }
 
@@ -322,13 +423,41 @@
     }
   }
 
-  const displayRows = computed(() => {
-    const result = [...rows.value]
-    if (newRow.value) {
-      result.unshift({ ...newRow.value, __rowIndex: -1 })
+  function getExportQuery(): string {
+    const q = '"'
+    return `SELECT * FROM ${q}${props.schema}${q}.${q}${props.table}${q}`
+  }
+
+  function openInspector(rowData: Record<string, unknown>, field: string) {
+    const column = tableData.value?.columns.find((c) => c.name === field)
+    inspectorRowData.value = rowData
+    inspectorColumn.value = field
+    inspectorColumnType.value = column?.data_type || ""
+    inspectorValue.value = rowData[field]
+    showValueInspector.value = true
+  }
+
+  function handleInspectorSave(newValue: unknown) {
+    if (!inspectorRowData.value || !inspectorColumn.value) return
+
+    const rowIndex = rows.value.findIndex(
+      (r) => r.__rowIndex === inspectorRowData.value?.__rowIndex
+    )
+    if (rowIndex === -1) return
+
+    const oldValue = inspectorRowData.value[inspectorColumn.value]
+    if (oldValue === newValue) return
+
+    inspectorRowData.value[inspectorColumn.value] = newValue
+
+    const rowKey = String(inspectorRowData.value.__rowIndex)
+    if (!editingRows.value[rowKey]) {
+      editingRows.value[rowKey] = {}
     }
-    return result
-  })
+    editingRows.value[rowKey][inspectorColumn.value] = newValue
+
+    saveRow(inspectorRowData.value)
+  }
 
   watch(
     () => [props.connectionId, props.schema, props.table],
@@ -385,6 +514,14 @@
           v-tooltip="'Clear Filters'"
         />
         <Button
+          icon="pi pi-download"
+          text
+          rounded
+          size="small"
+          @click="showExportDialog = true"
+          v-tooltip="'Export'"
+        />
+        <Button
           icon="pi pi-refresh"
           text
           rounded
@@ -406,17 +543,18 @@
     </div>
 
     <DataTable
+      ref="dataTableRef"
       :value="displayRows"
       :loading="loading"
       scrollable
       scroll-height="flex"
-      :virtualScrollerOptions="{ itemSize: 40 }"
+      :virtualScrollerOptions="virtualScrollerOptions"
       :paginator="!newRow"
       :rows="PAGE_SIZE"
       :totalRecords="tableData?.total_count || 0"
       :lazy="true"
       @page="onPage"
-      @sort="onSort"
+      @sort="onServerSort"
       :sortField="sortField || undefined"
       :sortOrder="sortOrder"
       editMode="cell"
@@ -436,15 +574,36 @@
       >
         <template #header>
           <div class="column-header">
-            <span class="column-name">
-              {{ col.name }}
-              <i
-                v-if="col.is_primary_key"
-                class="pi pi-key"
-                style="font-size: 0.7rem; color: var(--p-primary-color)"
-              />
-            </span>
-            <span class="column-type">{{ col.data_type }}</span>
+            <div class="column-header-content">
+              <span class="column-name">
+                {{ col.name }}
+                <i
+                  v-if="col.is_primary_key"
+                  class="pi pi-key"
+                  style="font-size: 0.7rem; color: var(--p-primary-color)"
+                />
+              </span>
+              <span class="column-type">{{ col.data_type }}</span>
+            </div>
+            <ColumnFilter
+              :column="col.name"
+              :connection-id="connectionId"
+              :schema="schema"
+              :table="table"
+              :current-filter="serverFilters[col.name]"
+              @apply="
+                (f) =>
+                  onServerFilter({
+                    filters: { ...serverFilters, [f.column]: f },
+                  })
+              "
+              @clear="
+                () => {
+                  delete serverFilters[col.name]
+                  onServerFilter({ filters: { ...serverFilters } })
+                }
+              "
+            />
           </div>
         </template>
         <template #filter>
@@ -466,6 +625,8 @@
         <template #body="slotProps">
           <span
             :class="{ 'null-value': slotProps.data[slotProps.field as string] === null }"
+            @dblclick="openInspector(slotProps.data, slotProps.field as string)"
+            class="cell-value"
           >
             {{
               slotProps.data[slotProps.field as string] === null
@@ -524,6 +685,22 @@
         </template>
       </Column>
     </DataTable>
+
+    <ExportDialog
+      v-model:visible="showExportDialog"
+      :connection-id="connectionId"
+      :query="getExportQuery()"
+      :total-records="tableData?.total_count || 0"
+    />
+
+    <ValueInspector
+      v-model:visible="showValueInspector"
+      :value="inspectorValue"
+      :column-name="inspectorColumn"
+      :column-type="inspectorColumnType"
+      :editable="true"
+      @save="handleInspectorSave"
+    />
   </div>
 </template>
 
@@ -585,6 +762,14 @@
 
   .column-header {
     display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 4px;
+    width: 100%;
+  }
+
+  .column-header-content {
+    display: flex;
     flex-direction: column;
     gap: 2px;
   }
@@ -618,5 +803,19 @@
 
   :deep(.p-datatable-tbody tr:first-child.new-row td) {
     border-color: var(--p-green-200);
+  }
+
+  .cell-value {
+    display: block;
+    cursor: pointer;
+    max-width: 300px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .cell-value:hover {
+    background: var(--p-surface-100);
+    border-radius: 2px;
   }
 </style>

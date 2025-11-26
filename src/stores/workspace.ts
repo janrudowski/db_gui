@@ -84,6 +84,99 @@ export const useWorkspaceStore = defineStore("workspace", () => {
     }
   }
 
+  function closeOtherTabs(paneId: string, keepTabId: string) {
+    const pane = panes.value.find((p) => p.id === paneId)
+    if (!pane) return
+
+    pane.tabs = pane.tabs.filter((t) => t.id === keepTabId)
+    pane.activeTabId = keepTabId
+  }
+
+  function closeSavedTabs(paneId: string) {
+    const pane = panes.value.find((p) => p.id === paneId)
+    if (!pane) return
+
+    const savedTabs = pane.tabs.filter((t) => !t.isDirty)
+    savedTabs.forEach((t) => {
+      const idx = pane.tabs.findIndex((tab) => tab.id === t.id)
+      if (idx !== -1) pane.tabs.splice(idx, 1)
+    })
+
+    if (pane.activeTabId && !pane.tabs.find((t) => t.id === pane.activeTabId)) {
+      pane.activeTabId = pane.tabs[0]?.id || null
+    }
+  }
+
+  function closeTabsToRight(paneId: string, tabId: string) {
+    const pane = panes.value.find((p) => p.id === paneId)
+    if (!pane) return
+
+    const idx = pane.tabs.findIndex((t) => t.id === tabId)
+    if (idx === -1) return
+
+    pane.tabs = pane.tabs.slice(0, idx + 1)
+
+    if (pane.activeTabId && !pane.tabs.find((t) => t.id === pane.activeTabId)) {
+      pane.activeTabId = pane.tabs[pane.tabs.length - 1]?.id || null
+    }
+  }
+
+  function closeActiveTab() {
+    const pane = activePane.value
+    if (!pane || !pane.activeTabId) return
+    closeTab(pane.id, pane.activeTabId)
+  }
+
+  function nextTab() {
+    const pane = activePane.value
+    if (!pane || pane.tabs.length === 0) return
+
+    const currentIdx = pane.tabs.findIndex((t) => t.id === pane.activeTabId)
+    const nextIdx = (currentIdx + 1) % pane.tabs.length
+    pane.activeTabId = pane.tabs[nextIdx].id
+  }
+
+  function previousTab() {
+    const pane = activePane.value
+    if (!pane || pane.tabs.length === 0) return
+
+    const currentIdx = pane.tabs.findIndex((t) => t.id === pane.activeTabId)
+    const prevIdx = currentIdx <= 0 ? pane.tabs.length - 1 : currentIdx - 1
+    pane.activeTabId = pane.tabs[prevIdx].id
+  }
+
+  function reorderTabs(paneId: string, tabs: Tab[]) {
+    const pane = panes.value.find((p) => p.id === paneId)
+    if (pane) {
+      pane.tabs = tabs
+    }
+  }
+
+  function addTabToPane(paneId: string, tab: Tab, index: number) {
+    const pane = panes.value.find((p) => p.id === paneId)
+    if (!pane) return
+
+    const exists = pane.tabs.find((t) => t.id === tab.id)
+    if (exists) return
+
+    pane.tabs.splice(index, 0, tab)
+    pane.activeTabId = tab.id
+  }
+
+  function removeTabFromPane(paneId: string, tabId: string) {
+    const pane = panes.value.find((p) => p.id === paneId)
+    if (!pane) return
+
+    const idx = pane.tabs.findIndex((t) => t.id === tabId)
+    if (idx === -1) return
+
+    pane.tabs.splice(idx, 1)
+
+    if (pane.activeTabId === tabId) {
+      pane.activeTabId = pane.tabs[0]?.id || null
+    }
+  }
+
   function setActiveTab(paneId: string, tabId: string) {
     const pane = panes.value.find((p) => p.id === paneId)
     if (pane) {
@@ -95,16 +188,47 @@ export const useWorkspaceStore = defineStore("workspace", () => {
     activePaneId.value = paneId
   }
 
-  function splitPane(direction: "horizontal" | "vertical") {
+  function splitPane(
+    targetPaneId: string,
+    position: "left" | "right" | "top" | "bottom",
+    tab?: Tab
+  ) {
     if (panes.value.length >= 4) return
 
+    const direction =
+      position === "left" || position === "right" ? "horizontal" : "vertical"
     splitDirection.value = direction
+
     const newPane: Pane = {
       id: generateId(),
-      tabs: [],
-      activeTabId: null,
+      tabs: tab ? [{ ...tab }] : [],
+      activeTabId: tab?.id || null,
     }
-    panes.value.push(newPane)
+
+    const targetIndex = panes.value.findIndex((p) => p.id === targetPaneId)
+    if (targetIndex === -1) {
+      panes.value.push(newPane)
+    } else if (position === "left" || position === "top") {
+      panes.value.splice(targetIndex, 0, newPane)
+    } else {
+      panes.value.splice(targetIndex + 1, 0, newPane)
+    }
+
+    if (tab) {
+      for (const pane of panes.value) {
+        if (pane.id !== newPane.id) {
+          const tabIndex = pane.tabs.findIndex((t) => t.id === tab.id)
+          if (tabIndex !== -1) {
+            pane.tabs.splice(tabIndex, 1)
+            if (pane.activeTabId === tab.id) {
+              pane.activeTabId = pane.tabs[0]?.id || null
+            }
+          }
+        }
+      }
+    }
+
+    activePaneId.value = newPane.id
   }
 
   function closePane(paneId: string) {
@@ -202,6 +326,15 @@ export const useWorkspaceStore = defineStore("workspace", () => {
     splitDirection,
     openTab,
     closeTab,
+    closeOtherTabs,
+    closeSavedTabs,
+    closeTabsToRight,
+    closeActiveTab,
+    nextTab,
+    previousTab,
+    reorderTabs,
+    addTabToPane,
+    removeTabFromPane,
     setActiveTab,
     setActivePane,
     splitPane,

@@ -7,6 +7,7 @@ import type {
   TestConnectionInput,
   SchemaInfo,
   TableInfo,
+  ColumnInfo,
 } from "../types"
 
 export const useConnectionsStore = defineStore("connections", () => {
@@ -102,6 +103,18 @@ export const useConnectionsStore = defineStore("connections", () => {
     return tables.value.get(key) || []
   }
 
+  async function getColumns(
+    connectionId: string,
+    schema: string,
+    table: string
+  ): Promise<ColumnInfo[]> {
+    return await invoke<ColumnInfo[]>("get_columns", {
+      connectionId,
+      schema,
+      table,
+    })
+  }
+
   return {
     connections,
     activeConnectionId,
@@ -120,5 +133,6 @@ export const useConnectionsStore = defineStore("connections", () => {
     loadTables,
     getSchemas,
     getTables,
+    getColumns,
   }
 })

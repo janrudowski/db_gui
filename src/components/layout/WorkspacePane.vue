@@ -1,8 +1,19 @@
 <script setup lang="ts">
-  import { computed, defineAsyncComponent, type Component } from "vue"
+  import {
+    ref,
+    computed,
+    defineAsyncComponent,
+    onMounted,
+    onUnmounted,
+    type Component,
+  } from "vue"
   import TabBar from "./TabBar.vue"
   import type { Pane, Tab, TabType } from "../../types"
   import { useWorkspaceStore } from "../../stores/workspace"
+  import {
+    dockingService,
+    type DockPosition,
+  } from "../../services/DockingService"
 
   const TableView = defineAsyncComponent(() => import("../data/TableView.vue"))
   const SqlEditor = defineAsyncComponent(
@@ -85,20 +96,114 @@
     workspaceStore.closeTab(props.pane.id, tabId)
   }
 
+  function handleCloseOthers(tabId: string) {
+    workspaceStore.closeOtherTabs(props.pane.id, tabId)
+  }
+
+  function handleCloseSaved() {
+    workspaceStore.closeSavedTabs(props.pane.id)
+  }
+
+  function handleCloseToRight(tabId: string) {
+    workspaceStore.closeTabsToRight(props.pane.id, tabId)
+  }
+
   function handleReorderTabs(tabs: Tab[]) {
-    props.pane.tabs.splice(0, props.pane.tabs.length, ...tabs)
+    workspaceStore.reorderTabs(props.pane.id, tabs)
+  }
+
+  function handleTabAdded(tab: Tab, index: number) {
+    workspaceStore.addTabToPane(props.pane.id, tab, index)
+  }
+
+  function handleTabRemoved(tab: Tab) {
+    workspaceStore.removeTabFromPane(props.pane.id, tab.id)
   }
 
   function handleTabSaved() {
     workspaceStore.setTabDirty(activeTab.value?.id || "", false)
   }
+
+  const paneElement = ref<HTMLElement | null>(null)
+  const dropPosition = ref<DockPosition>(null)
+  const isDragOver = ref(false)
+
+  function updatePaneRect() {
+    if (paneElement.value) {
+      const rect = paneElement.value.getBoundingClientRect()
+      dockingService.updatePaneRect(props.pane.id, {
+        x: rect.x,
+        y: rect.y,
+        width: rect.width,
+        height: rect.height,
+      })
+    }
+  }
+
+  function handleDragOver(event: DragEvent) {
+    event.preventDefault()
+    isDragOver.value = true
+    if (paneElement.value) {
+      const rect = paneElement.value.getBoundingClientRect()
+      dockingService.updatePaneRect(props.pane.id, {
+        x: rect.x,
+        y: rect.y,
+        width: rect.width,
+        height: rect.height,
+      })
+    }
+    dropPosition.value = dockingService.handleDragOver(event, props.pane.id)
+  }
+
+  function handleDragLeave() {
+    isDragOver.value = false
+    dropPosition.value = null
+  }
+
+  function handleDrop(event: DragEvent) {
+    event.preventDefault()
+    isDragOver.value = false
+
+    const result = dockingService.endDrag()
+    if (result.tab && result.dropPosition && result.dropPosition !== "center") {
+      workspaceStore.splitPane(props.pane.id, result.dropPosition, result.tab)
+    } else if (result.tab && result.sourcePaneId !== props.pane.id) {
+      workspaceStore.addTabToPane(
+        props.pane.id,
+        result.tab,
+        props.pane.tabs.length
+      )
+    }
+    dropPosition.value = null
+  }
+
+  const dropIndicatorStyle = computed(() => {
+    return dockingService.getDropIndicatorStyle(dropPosition.value)
+  })
+
+  onMounted(() => {
+    updatePaneRect()
+    window.addEventListener("resize", updatePaneRect)
+  })
+
+  onUnmounted(() => {
+    dockingService.unregisterPane(props.pane.id)
+    window.removeEventListener("resize", updatePaneRect)
+  })
 </script>
 
 <template>
   <div
+    ref="paneElement"
     class="workspace-pane"
-    :class="{ active: workspaceStore.activePaneId === pane.id }"
+    :class="{
+      active: workspaceStore.activePaneId === pane.id,
+      'drag-over': isDragOver,
+    }"
     @click="workspaceStore.setActivePane(pane.id)"
+    @dragover="handleDragOver"
+    @dragleave="handleDragLeave"
+    @drop="handleDrop"
   >
     <TabBar
       :tabs="pane.tabs"
@@ -106,7 +211,12 @@
       :pane-id="pane.id"
       @select="handleSelectTab"
       @close="handleCloseTab"
+      @close-others="handleCloseOthers"
+      @close-saved="handleCloseSaved"
+      @close-to-right="handleCloseToRight"
       @reorder="handleReorderTabs"
+      @tab-added="handleTabAdded"
+      @tab-removed="handleTabRemoved"
     />
 
     <div class="pane-content">
@@ -127,6 +237,12 @@
         >
       </div>
     </div>
+
+    <div
+      v-if="dropIndicatorStyle && isDragOver"
+      class="drop-indicator"
+      :style="dropIndicatorStyle"
+    />
   </div>
 </template>
 
@@ -171,5 +287,20 @@
   .empty-pane .hint {
     font-size: 0.85rem;
     opacity: 0.7;
+  }
+
+  .workspace-pane {
+    position: relative;
+  }
+
+  .workspace-pane.drag-over {
+    border-color: var(--p-primary-color);
+    border-style: dashed;
+  }
+
+  .drop-indicator {
+    position: absolute;
+    pointer-events: none;
+    z-index: 1000;
   }
 </style>

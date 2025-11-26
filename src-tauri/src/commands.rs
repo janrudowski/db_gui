@@ -217,15 +217,124 @@ pub async fn get_table_data(
     conn.get_table_data(params).await.map_err(|e| e.to_string())
 }
 
+#[derive(Debug, Deserialize)]
+pub struct SqlSort {
+    pub column: String,
+    pub direction: String,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct SqlFilter {
+    pub column: String,
+    pub operator: String,
+    pub value: serde_json::Value,
+}
+
 #[tauri::command]
 pub async fn execute_query(
     state: State<'_, AppState>,
     connection_id: String,
     sql: String,
+    limit: Option<u32>,
+    offset: Option<u32>,
+    sort: Option<SqlSort>,
+    filters: Option<Vec<SqlFilter>>,
 ) -> Result<QueryResult, String> {
     let active = state.active_connections.read().await;
     let conn = active.get(&connection_id).ok_or("No active connection")?;
-    conn.execute_query(&sql).await.map_err(|e| e.to_string())
+
+    let base_sql = sql.trim().trim_end_matches(';');
+
+    let mut clauses = Vec::new();
+
+    if let Some(filter_list) = &filters {
+        for f in filter_list {
+            let clause = match f.operator.as_str() {
+                "in" => {
+                    if let Some(arr) = f.value.as_array() {
+                        let vals: Vec<String> = arr
+                            .iter()
+                            .map(|v| format!("'{}'", v.as_str().unwrap_or("").replace('\'', "''")))
+                            .collect();
+                        format!("\"{}\" IN ({})", f.column, vals.join(","))
+                    } else {
+                        continue;
+                    }
+                }
+                "contains" => format!(
+                    "CAST(\"{}\" AS TEXT) ILIKE '%{}%'",
+                    f.column,
+                    f.value.as_str().unwrap_or("").replace('\'', "''")
+                ),
+                "equals" => {
+                    let val = f.value.as_str().unwrap_or("").replace('\'', "''");
+                    if val.parse::<f64>().is_ok() {
+                        format!("\"{}\" = {}", f.column, val)
+                    } else {
+                        format!("\"{}\" = '{}'", f.column, val)
+                    }
+                }
+                "isNull" => format!("\"{}\" IS NULL", f.column),
+                "isNotNull" => format!("\"{}\" IS NOT NULL", f.column),
+                _ => continue,
+            };
+            clauses.push(clause);
+        }
+    }
+
+    let where_clause = if clauses.is_empty() {
+        String::new()
+    } else {
+        format!(" WHERE {}", clauses.join(" AND "))
+    };
+
+    let order_clause = if let Some(s) = &sort {
+        format!(
+            " ORDER BY \"{}\" {}",
+            s.column,
+            if s.direction == "desc" { "DESC" } else { "ASC" }
+        )
+    } else {
+        String::new()
+    };
+
+    let limit_clause = if let Some(lim) = limit {
+        let off = offset.unwrap_or(0);
+        format!(" LIMIT {} OFFSET {}", lim, off)
+    } else {
+        String::new()
+    };
+
+    let final_sql = if filters.is_some() || sort.is_some() {
+        format!(
+            "SELECT * FROM ({}) AS _subq{}{}{}",
+            base_sql, where_clause, order_clause, limit_clause
+        )
+    } else if limit.is_some() {
+        format!("{}{}", base_sql, limit_clause)
+    } else {
+        sql
+    };
+
+    conn.execute_query(&final_sql)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn get_distinct_values(
+    state: State<'_, AppState>,
+    connection_id: String,
+    schema: String,
+    table: String,
+    column: String,
+    limit: Option<u32>,
+) -> Result<Vec<serde_json::Value>, String> {
+    let active = state.active_connections.read().await;
+    let conn = active.get(&connection_id).ok_or("No active connection")?;
+    conn.get_distinct_values(&schema, &table, &column, limit.or(Some(200)))
+        .await
+        .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -310,4 +419,108 @@ pub async fn alter_table(
     let active = state.active_connections.read().await;
     let conn = active.get(&connection_id).ok_or("No active connection")?;
     conn.alter_table(params).await.map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn export_data(
+    state: State<'_, AppState>,
+    connection_id: String,
+    query: String,
+    format: String,
+    file_path: String,
+) -> Result<u64, String> {
+    let active = state.active_connections.read().await;
+    let conn = active.get(&connection_id).ok_or("No active connection")?;
+
+    let result = conn
+        .execute_query(&query)
+        .await
+        .map_err(|e| e.to_string())?;
+
+    let file = std::fs::File::create(&file_path).map_err(|e| e.to_string())?;
+
+    match format.as_str() {
+        "csv" => {
+            let mut writer = csv::Writer::from_writer(file);
+            writer
+                .write_record(&result.columns)
+                .map_err(|e| e.to_string())?;
+
+            for row in &result.rows {
+                let string_row: Vec<String> = row
+                    .iter()
+                    .map(|v| match v {
+                        serde_json::Value::Null => String::new(),
+                        serde_json::Value::String(s) => s.clone(),
+                        other => other.to_string(),
+                    })
+                    .collect();
+                writer
+                    .write_record(&string_row)
+                    .map_err(|e| e.to_string())?;
+            }
+            writer.flush().map_err(|e| e.to_string())?;
+        }
+        "json" => {
+            let rows_as_objects: Vec<serde_json::Value> = result
+                .rows
+                .iter()
+                .map(|row| {
+                    let mut obj = serde_json::Map::new();
+                    for (i, col) in result.columns.iter().enumerate() {
+                        obj.insert(
+                            col.clone(),
+                            row.get(i).cloned().unwrap_or(serde_json::Value::Null),
+                        );
+                    }
+                    serde_json::Value::Object(obj)
+                })
+                .collect();
+
+            serde_json::to_writer_pretty(file, &rows_as_objects).map_err(|e| e.to_string())?;
+        }
+        _ => return Err(format!("Unsupported format: {}", format)),
+    }
+
+    Ok(result.rows.len() as u64)
+}
+
+#[tauri::command]
+pub async fn begin_transaction(
+    state: State<'_, AppState>,
+    connection_id: String,
+) -> Result<(), String> {
+    let active = state.active_connections.read().await;
+    let conn = active.get(&connection_id).ok_or("No active connection")?;
+    conn.begin_transaction().await.map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn commit_transaction(
+    state: State<'_, AppState>,
+    connection_id: String,
+) -> Result<(), String> {
+    let active = state.active_connections.read().await;
+    let conn = active.get(&connection_id).ok_or("No active connection")?;
+    conn.commit().await.map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn rollback_transaction(
+    state: State<'_, AppState>,
+    connection_id: String,
+) -> Result<(), String> {
+    let active = state.active_connections.read().await;
+    let conn = active.get(&connection_id).ok_or("No active connection")?;
+    conn.rollback().await.map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn get_transaction_status(
+    state: State<'_, AppState>,
+    connection_id: String,
+) -> Result<bool, String> {
+    let active = state.active_connections.read().await;
+    let conn = active.get(&connection_id).ok_or("No active connection")?;
+    Ok(conn.in_transaction().await)
 }

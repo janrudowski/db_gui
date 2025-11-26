@@ -188,6 +188,14 @@ pub trait DbConnection: Send + Sync {
 
     async fn get_table_data(&self, params: FetchDataParams) -> DbResult<TableData>;
 
+    async fn get_distinct_values(
+        &self,
+        schema: &str,
+        table: &str,
+        column: &str,
+        limit: Option<u32>,
+    ) -> DbResult<Vec<serde_json::Value>>;
+
     async fn execute_query(&self, sql: &str) -> DbResult<QueryResult>;
 
     async fn update_row(&self, update: RowUpdate) -> DbResult<u64>;
@@ -203,6 +211,14 @@ pub trait DbConnection: Send + Sync {
     async fn drop_table(&self, schema: &str, table: &str, cascade: bool) -> DbResult<()>;
 
     async fn alter_table(&self, params: AlterTableParams) -> DbResult<()>;
+
+    async fn begin_transaction(&self) -> DbResult<()>;
+
+    async fn commit(&self) -> DbResult<()>;
+
+    async fn rollback(&self) -> DbResult<()>;
+
+    async fn in_transaction(&self) -> bool;
 
     async fn close(&self) -> DbResult<()>;
 }

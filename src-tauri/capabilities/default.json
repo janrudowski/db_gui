@@ -8,6 +8,10 @@
   "permissions": [
     "core:default",
     "opener:default",
-    "stronghold:default"
+    "stronghold:default",
+    "core:menu:default",
+    "core:tray:default",
+    "core:image:default",
+    "core:window:default"
   ]
 }
