@@ -262,7 +262,7 @@ export const useWorkspaceStore = defineStore("workspace", () => {
     if (panes.value.length >= 4) return
 
     const direction =
-      position === "left" || position === "right" ? "horizontal" : "vertical"
+      position === "top" || position === "bottom" ? "horizontal" : "vertical"
     splitDirection.value = direction
 
     const newPane: Pane = {

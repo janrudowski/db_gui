@@ -7,6 +7,7 @@
   import type { Tab, TabType } from "../../types"
   import { TAB_ICONS } from "../../types"
   import { useWorkspaceStore } from "../../stores/workspace"
+  import { dockingService } from "../../services/DockingService"
 
   interface DragChangeEvent {
     added?: { element: Tab; newIndex: number }
@@ -64,6 +65,10 @@
       localTabsBefore: localTabs.value.map((t) => t.id),
     })
     isDragging.value = true
+    const draggedTab = localTabs.value[event.oldIndex]
+    if (draggedTab) {
+      dockingService.startDrag(draggedTab, props.paneId)
+    }
   }
 
   function onDragEnd(event: any) {
@@ -73,11 +78,31 @@
       localTabsAfter: localTabs.value.map((t) => t.id),
     })
     isDragging.value = false
-    console.log(
-      "[TabBar] Calling workspaceStore.setTabs with:",
-      [...localTabs.value].map((t) => t.id)
-    )
-    workspaceStore.setTabs(props.paneId, [...localTabs.value])
+
+    const dragResult = dockingService.endDrag()
+    console.log("[TabBar] dragResult:", dragResult)
+
+    if (
+      dragResult.dropPosition &&
+      dragResult.dropPosition !== "center" &&
+      dragResult.tab
+    ) {
+      console.log(
+        "[TabBar] Creating new pane with position:",
+        dragResult.dropPosition
+      )
+      workspaceStore.splitPane(
+        props.paneId,
+        dragResult.dropPosition,
+        dragResult.tab
+      )
+    } else {
+      console.log(
+        "[TabBar] Calling workspaceStore.setTabs with:",
+        [...localTabs.value].map((t) => t.id)
+      )
+      workspaceStore.setTabs(props.paneId, [...localTabs.value])
+    }
   }
 
   function handleDragChange(event: DragChangeEvent) {

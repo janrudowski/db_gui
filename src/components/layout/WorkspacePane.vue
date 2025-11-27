@@ -10,6 +10,10 @@
   import TabBar from "./TabBar.vue"
   import type { Pane, Tab, TabType } from "../../types"
   import { useWorkspaceStore } from "../../stores/workspace"
+  import {
+    dockingService,
+    type DockPosition,
+  } from "../../services/DockingService"
 
   const TableView = defineAsyncComponent(() => import("../data/TableView.vue"))
   const SqlEditor = defineAsyncComponent(
@@ -117,13 +121,109 @@
   }
 
   const paneElement = ref<HTMLElement | null>(null)
+  const dropPosition = ref<DockPosition>(null)
+  const pendingPosition = ref<DockPosition>(null)
+  const hoverTimeout = ref<ReturnType<typeof setTimeout> | null>(null)
+  const HOVER_DELAY = 400
+
+  function updatePaneRect() {
+    if (paneElement.value) {
+      const rect = paneElement.value.getBoundingClientRect()
+      dockingService.registerPane(props.pane.id, {
+        x: rect.x,
+        y: rect.y,
+        width: rect.width,
+        height: rect.height,
+      })
+    }
+  }
+
+  function clearHoverTimeout() {
+    if (hoverTimeout.value) {
+      clearTimeout(hoverTimeout.value)
+      hoverTimeout.value = null
+    }
+  }
+
+  function handlePaneMouseMove(event: MouseEvent) {
+    if (!dockingService.dragState.isDragging) {
+      dropPosition.value = null
+      pendingPosition.value = null
+      clearHoverTimeout()
+      return
+    }
+
+    const rect = paneElement.value?.getBoundingClientRect()
+    if (!rect) return
+
+    const relX = (event.clientX - rect.x) / rect.width
+    const relY = (event.clientY - rect.y) / rect.height
+
+    const EDGE = 0.08
+    let newPosition: DockPosition = null
+
+    if (relX > 1 - EDGE) {
+      newPosition = "right"
+    } else if (relY > 1 - EDGE) {
+      newPosition = "bottom"
+    } else {
+      newPosition = "center"
+    }
+
+    if (
+      dockingService.dragState.sourcePaneId === props.pane.id &&
+      newPosition === "center"
+    ) {
+      dropPosition.value = null
+      pendingPosition.value = null
+      clearHoverTimeout()
+      return
+    }
+
+    if (newPosition !== pendingPosition.value) {
+      pendingPosition.value = newPosition
+      clearHoverTimeout()
+
+      if (newPosition && newPosition !== "center") {
+        hoverTimeout.value = setTimeout(() => {
+          dropPosition.value = newPosition
+          dockingService.dragState.targetPaneId = props.pane.id
+          dockingService.dragState.dropPosition = newPosition
+        }, HOVER_DELAY)
+      } else {
+        dropPosition.value = null
+        dockingService.dragState.targetPaneId = null
+        dockingService.dragState.dropPosition = null
+      }
+    }
+  }
+
+  function handlePaneMouseLeave() {
+    dropPosition.value = null
+    pendingPosition.value = null
+    clearHoverTimeout()
+    if (dockingService.dragState.targetPaneId === props.pane.id) {
+      dockingService.dragState.targetPaneId = null
+      dockingService.dragState.dropPosition = null
+    }
+  }
+
+  const dropIndicatorStyle = computed(() => {
+    if (!dropPosition.value || dropPosition.value === "center") return null
+    return dockingService.getDropIndicatorStyle(dropPosition.value)
+  })
 
   onMounted(() => {
     console.log("[WorkspacePane] mounted", { paneId: props.pane.id })
+    updatePaneRect()
+    window.addEventListener("resize", updatePaneRect)
   })
 
   onUnmounted(() => {
     console.log("[WorkspacePane] unmounted", { paneId: props.pane.id })
+    clearHoverTimeout()
+    dockingService.unregisterPane(props.pane.id)
+    window.removeEventListener("resize", updatePaneRect)
   })
 </script>
 
@@ -133,7 +233,14 @@
     class="workspace-pane"
     :class="{ active: workspaceStore.activePaneId === pane.id }"
     @click="workspaceStore.setActivePane(pane.id)"
+    @mousemove="handlePaneMouseMove"
+    @mouseleave="handlePaneMouseLeave"
   >
+    <div
+      v-if="dropIndicatorStyle"
+      class="drop-indicator"
+      :style="dropIndicatorStyle"
+    />
     <TabBar
       :tabs="pane.tabs"
       :active-tab-id="pane.activeTabId"
@@ -213,5 +320,11 @@
 
   .workspace-pane {
     position: relative;
+  }
+
+  .drop-indicator {
+    position: absolute;
+    pointer-events: none;
+    z-index: 1000;
   }
 </style>
