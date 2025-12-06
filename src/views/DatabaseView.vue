@@ -87,6 +87,12 @@
           leaf: true,
           data: { type: "table", schema: t.schema, name: t.name },
         }))
+
+        tables.forEach((t) => {
+          connectionsStore
+            .getColumns(props.id, t.schema, t.name)
+            .catch(() => {})
+        })
       } catch (e) {
         console.error(e)
       }
@@ -538,7 +544,7 @@
           @click="
             workspaceStore.splitPane(workspaceStore.activePaneId, 'right')
           "
-          v-tooltip="'Split Vertical'"
+          v-tooltip.left="'Split Vertical'"
           :disabled="workspaceStore.panes.length >= 4"
         />
         <Button
@@ -548,7 +554,7 @@
           @click="
             workspaceStore.splitPane(workspaceStore.activePaneId, 'bottom')
           "
-          v-tooltip="'Split Horizontal'"
+          v-tooltip.left="'Split Horizontal'"
           :disabled="workspaceStore.panes.length >= 4"
         />
         <ThemeToggle />
@@ -666,56 +672,75 @@
   .header {
     display: flex;
     align-items: center;
-    gap: 1rem;
-    padding: 0.5rem 1rem;
+    gap: var(--space-4);
+    padding: var(--space-3) var(--space-4);
     background: var(--p-surface-0);
     border-bottom: 1px solid var(--p-surface-200);
+    position: relative;
   }
 
   .connection-info {
     display: flex;
     flex-direction: column;
+    gap: 2px;
   }
 
   .connection-name {
     font-weight: 600;
     font-size: 1rem;
+    color: var(--p-text-color);
   }
 
   .connection-details {
     font-size: 0.75rem;
+    font-family: var(--font-mono);
     color: var(--p-text-muted-color);
   }
 
   .header-actions {
     display: flex;
     align-items: center;
-    gap: 0.5rem;
+    gap: var(--space-2);
     margin-left: auto;
   }
 
   .transaction-controls {
     display: flex;
     align-items: center;
-    gap: 0.75rem;
+    gap: var(--space-3);
   }
 
   .transaction-tag {
-    font-size: 0.7rem;
+    font-size: 0.65rem;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    animation: pulse 2s ease-in-out infinite;
+  }
+
+  @keyframes pulse {
+    0%,
+    100% {
+      opacity: 1;
+    }
+    50% {
+      opacity: 0.7;
+    }
   }
 
   .auto-commit-toggle {
     display: flex;
     align-items: center;
-    gap: 0.5rem;
-    font-size: 0.85rem;
+    gap: var(--space-2);
+    font-size: 0.8rem;
+    color: var(--p-text-muted-color);
+    font-weight: 500;
   }
 
   .header-separator {
     width: 1px;
     height: 24px;
     background: var(--p-surface-300);
-    margin: 0 0.5rem;
+    margin: 0 var(--space-2);
   }
 
   .content {
@@ -743,6 +768,7 @@
     flex: 1;
     overflow: hidden;
     padding: 0;
+    background: transparent;
   }
 
   :deep(.sidebar-tabs .p-tabview-panel) {
@@ -753,11 +779,28 @@
   :deep(.sidebar-tabs .p-tabview-nav) {
     background: var(--p-surface-50);
     border-bottom: 1px solid var(--p-surface-200);
+    padding: 0 var(--space-2);
   }
 
   :deep(.sidebar-tabs .p-tabview-nav-link) {
-    padding: 0.5rem 0.75rem;
-    font-size: 0.85rem;
+    padding: var(--space-2) var(--space-3);
+    font-size: 0.8rem;
+    font-weight: 500;
+    color: var(--p-text-muted-color);
+    border: none;
+    border-radius: var(--radius-md) var(--radius-md) 0 0;
+    transition: all var(--transition-fast);
+  }
+
+  :deep(.sidebar-tabs .p-tabview-nav-link:hover) {
+    color: var(--p-text-color);
+    background: var(--p-surface-100);
+  }
+
+  :deep(.sidebar-tabs .p-tabview-nav-link.p-tabview-nav-link-active) {
+    color: var(--p-primary-color);
+    background: var(--p-surface-0);
+    border-bottom: 2px solid var(--p-primary-color);
   }
 
   .sidebar-panel {
@@ -770,27 +813,56 @@
     display: flex;
     align-items: center;
     justify-content: flex-end;
-    padding: 0.5rem 0.75rem;
+    padding: var(--space-2) var(--space-3);
     border-bottom: 1px solid var(--p-surface-100);
+    background: var(--p-surface-50);
   }
 
   .sidebar-actions {
     display: flex;
-    gap: 0.25rem;
+    gap: var(--space-1);
   }
 
   .schema-tree {
     flex: 1;
     overflow: auto;
-    padding: 0.5rem;
+    padding: var(--space-2);
     background: transparent;
     border: none;
+  }
+
+  :deep(.schema-tree .p-tree-node-content) {
+    padding: var(--space-2) var(--space-3);
+    border-radius: var(--radius-md);
+    transition: all var(--transition-fast);
+  }
+
+  :deep(.schema-tree .p-tree-node-content:hover) {
+    background: var(--p-surface-100);
+  }
+
+  :deep(.schema-tree .p-tree-node-content.p-highlight) {
+    background: var(--p-highlight-background);
+  }
+
+  :deep(.schema-tree .p-tree-node-content.p-highlight .p-tree-node-label) {
+    color: var(--p-primary-color);
+  }
+
+  :deep(.schema-tree .p-tree-node-icon) {
+    color: var(--p-text-muted-color);
+  }
+
+  :deep(.schema-tree .p-tree-node-label) {
+    font-size: 0.85rem;
+    font-family: var(--font-ui);
   }
 
   .main-content {
     flex: 1;
     overflow: hidden;
-    padding: 0.5rem;
+    padding: var(--space-2);
+    background: var(--p-surface-ground);
   }
 
   :deep(.splitpanes) {
@@ -803,15 +875,22 @@
 
   :deep(.splitpanes__splitter) {
     background: var(--p-surface-200);
+    transition: background var(--transition-fast);
+  }
+
+  :deep(.splitpanes__splitter:hover) {
+    background: var(--p-primary-color);
   }
 
   :deep(.splitpanes--vertical > .splitpanes__splitter) {
-    width: 6px;
+    width: 4px;
     margin: 0 2px;
+    border-radius: 2px;
   }
 
   :deep(.splitpanes--horizontal > .splitpanes__splitter) {
-    height: 6px;
+    height: 4px;
     margin: 2px 0;
+    border-radius: 2px;
   }
 </style>

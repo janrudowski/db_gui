@@ -53,14 +53,13 @@
   const inspectorColumnType = ref("")
   const inspectorRowData = ref<Record<string, unknown> | null>(null)
 
-  const CHUNK_SIZE = 100
+  const CHUNK_SIZE = 1000
   const ROW_HEIGHT = 40
   const serverFilters = ref<Record<string, ColumnFilterValue>>({})
   const dataTableRef = ref<InstanceType<typeof DataTable> | null>(null)
   const rowContextMenu = ref()
   const contextRow = ref<Record<string, unknown> | null>(null)
   const contextField = ref<string | null>(null)
-
   const rows = ref<Record<string, unknown>[]>([])
 
   const primaryKeyColumn = computed(() => {
@@ -572,7 +571,7 @@
     if (!inspectorRowData.value || !inspectorColumn.value) return
 
     const rowIndex = rows.value.findIndex(
-      (r) => r.__rowIndex === inspectorRowData.value?.__rowIndex
+      (r) => r?.__rowIndex === inspectorRowData.value?.__rowIndex
     )
     if (rowIndex === -1) return
 
@@ -888,13 +887,17 @@
     display: flex;
     flex-direction: column;
     height: 100%;
+    background: var(--p-surface-0);
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+    border: 1px solid var(--p-surface-200);
   }
 
   .toolbar {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 0.5rem 1rem;
+    padding: var(--space-3) var(--space-4);
     background: var(--p-surface-100);
     border-bottom: 1px solid var(--p-surface-200);
   }
@@ -902,48 +905,98 @@
   .toolbar-actions {
     display: flex;
     align-items: center;
-    gap: 0.25rem;
+    gap: var(--space-1);
   }
 
   .table-info {
     display: flex;
     align-items: center;
-    gap: 0.5rem;
-    font-weight: 500;
+    gap: var(--space-3);
+    font-weight: 600;
+    font-size: 0.9rem;
+  }
+
+  .table-info i {
+    color: var(--amber-500);
   }
 
   .row-count {
     color: var(--p-text-muted-color);
-    font-weight: normal;
+    font-weight: 500;
+    font-size: 0.8rem;
+    font-family: var(--font-mono);
   }
 
   .filter-hint {
     display: flex;
     align-items: center;
-    gap: 0.5rem;
-    padding: 0.35rem 1rem;
+    gap: var(--space-2);
+    padding: var(--space-2) var(--space-4);
     background: var(--p-surface-50);
     border-bottom: 1px solid var(--p-surface-200);
     font-size: 0.75rem;
     color: var(--p-text-muted-color);
   }
 
+  .filter-hint i {
+    color: var(--p-primary-color);
+  }
+
   .filter-hint code {
     background: var(--p-surface-200);
-    padding: 0.1rem 0.3rem;
-    border-radius: 3px;
-    font-family: monospace;
+    color: var(--p-text-color);
+    padding: 2px 6px;
+    border-radius: var(--radius-sm);
+    font-family: var(--font-mono);
+    font-size: 0.7rem;
   }
 
   .data-grid {
     flex: 1;
   }
 
+  /* DataTable overrides */
+  :deep(.p-datatable) {
+    background: transparent;
+    border: none;
+  }
+
+  :deep(.p-datatable .p-datatable-thead > tr > th) {
+    background: var(--p-surface-100);
+    border-bottom: 1px solid var(--p-surface-200);
+    padding: var(--space-3) var(--space-4);
+  }
+
+  :deep(.p-datatable .p-datatable-tbody > tr) {
+    background: var(--p-surface-0);
+    transition: background var(--transition-fast);
+  }
+
+  :deep(.p-datatable .p-datatable-tbody > tr:hover) {
+    background: var(--p-surface-50);
+  }
+
+  :deep(.p-datatable .p-datatable-tbody > tr > td) {
+    border-bottom: 1px solid var(--p-surface-100);
+    padding: var(--space-2) var(--space-4);
+    font-family: var(--font-mono);
+    font-size: 0.8rem;
+    color: var(--p-text-color);
+  }
+
+  :deep(.p-datatable .p-datatable-tbody > tr.p-row-odd) {
+    background: var(--p-surface-50);
+  }
+
+  :deep(.p-datatable .p-datatable-tbody > tr.p-row-odd:hover) {
+    background: var(--p-surface-100);
+  }
+
   .column-header {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 4px;
+    gap: var(--space-2);
     width: 100%;
   }
 
@@ -956,19 +1009,31 @@
   .column-name {
     display: flex;
     align-items: center;
-    gap: 4px;
+    gap: var(--space-2);
     font-weight: 600;
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--p-text-color);
+    font-family: var(--font-ui);
+  }
+
+  .column-name .pi-key {
+    color: var(--p-primary-color) !important;
+    font-size: 0.65rem !important;
   }
 
   .column-type {
-    font-size: 0.75rem;
+    font-size: 0.7rem;
     color: var(--p-text-muted-color);
-    font-weight: normal;
+    font-weight: 500;
+    font-family: var(--font-mono);
   }
 
   .null-value {
     color: var(--p-text-muted-color);
     font-style: italic;
+    opacity: 0.8;
   }
 
   .row-actions {
@@ -977,11 +1042,11 @@
   }
 
   :deep(.p-datatable-tbody tr:first-child.new-row) {
-    background: var(--p-green-50) !important;
+    background: var(--success-glow) !important;
   }
 
   :deep(.p-datatable-tbody tr:first-child.new-row td) {
-    border-color: var(--p-green-200);
+    border-color: rgba(16, 185, 129, 0.3);
   }
 
   .cell-value {
@@ -991,10 +1056,40 @@
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+    padding: var(--space-1);
+    margin: calc(-1 * var(--space-1));
+    border-radius: var(--radius-sm);
+    transition: background var(--transition-fast);
   }
 
   .cell-value:hover {
     background: var(--p-surface-100);
-    border-radius: 2px;
+  }
+
+  /* Filter row inputs */
+  :deep(.p-datatable .p-datatable-thead .p-column-filter) {
+    width: 100%;
+  }
+
+  :deep(.p-datatable .p-datatable-thead .p-inputtext) {
+    font-size: 0.8rem;
+    padding: var(--space-1) var(--space-2);
+    background: var(--p-surface-0);
+    border-color: var(--p-surface-200);
+    font-family: var(--font-mono);
+  }
+
+  :deep(.p-datatable .p-datatable-thead .p-inputtext:focus) {
+    border-color: var(--p-primary-color);
+    box-shadow: 0 0 0 2px rgba(245, 158, 11, 0.15);
+  }
+
+  /* Frozen column styling */
+  :deep(.p-datatable .p-datatable-frozen-tbody > tr > td) {
+    background: var(--p-surface-0);
+  }
+
+  :deep(.p-datatable .p-datatable-frozen-tbody > tr:hover > td) {
+    background: var(--p-surface-50);
   }
 </style>

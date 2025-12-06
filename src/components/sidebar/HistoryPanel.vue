@@ -157,16 +157,22 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 0.75rem 1rem;
+    padding: var(--space-3) var(--space-4);
     border-bottom: 1px solid var(--p-surface-200);
+    background: var(--p-surface-50);
   }
 
   .panel-title {
     display: flex;
     align-items: center;
-    gap: 0.5rem;
+    gap: var(--space-2);
     font-weight: 600;
-    font-size: 0.9rem;
+    font-size: 0.85rem;
+    color: var(--p-text-color);
+  }
+
+  .panel-title i {
+    color: var(--p-primary-color);
   }
 
   .history-list {
@@ -179,26 +185,34 @@
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    padding: 2rem;
+    padding: var(--space-8);
     color: var(--p-text-muted-color);
     text-align: center;
+    gap: var(--space-2);
   }
 
   .empty-state i {
-    font-size: 2rem;
-    margin-bottom: 0.5rem;
+    font-size: 2.5rem;
+    opacity: 0.4;
+    color: var(--p-text-muted-color);
+  }
+
+  .empty-state p {
+    margin: 0;
+    color: var(--p-text-muted-color);
   }
 
   .empty-state .hint {
     font-size: 0.8rem;
+    color: var(--p-text-muted-color);
     opacity: 0.7;
   }
 
   .history-entry {
-    padding: 0.75rem 1rem;
+    padding: var(--space-3) var(--space-4);
     border-bottom: 1px solid var(--p-surface-100);
     cursor: pointer;
-    transition: background 0.15s;
+    transition: background var(--transition-fast);
   }
 
   .history-entry:hover {
@@ -206,49 +220,60 @@
   }
 
   .history-entry.error {
-    border-left: 3px solid var(--p-red-500);
+    border-left: 3px solid var(--danger);
+    background: rgba(239, 68, 68, 0.05);
+  }
+
+  .history-entry.error:hover {
+    background: rgba(239, 68, 68, 0.1);
   }
 
   .entry-header {
     display: flex;
     align-items: center;
-    gap: 0.5rem;
-    margin-bottom: 0.35rem;
+    gap: var(--space-2);
+    margin-bottom: var(--space-2);
   }
 
   .status-tag {
-    font-size: 0.65rem;
-    padding: 0.1rem 0.35rem;
+    font-size: 0.6rem;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    padding: 2px 6px;
   }
 
   .entry-time {
-    font-size: 0.75rem;
+    font-size: 0.7rem;
     color: var(--p-text-muted-color);
   }
 
   .entry-duration {
-    font-size: 0.75rem;
+    font-size: 0.7rem;
+    font-family: var(--font-mono);
     color: var(--p-text-muted-color);
     margin-left: auto;
   }
 
   .entry-sql {
-    font-family: "JetBrains Mono", "Fira Code", monospace;
-    font-size: 0.8rem;
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
     color: var(--p-text-color);
     word-break: break-all;
+    line-height: 1.4;
   }
 
   .entry-rows {
-    font-size: 0.75rem;
+    font-size: 0.7rem;
+    font-family: var(--font-mono);
     color: var(--p-text-muted-color);
-    margin-top: 0.25rem;
+    margin-top: var(--space-1);
   }
 
   .entry-error {
-    font-size: 0.75rem;
-    color: var(--p-red-500);
-    margin-top: 0.25rem;
+    font-size: 0.7rem;
+    font-family: var(--font-mono);
+    color: var(--danger);
+    margin-top: var(--space-1);
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -256,8 +281,8 @@
 
   .entry-actions {
     display: none;
-    gap: 0.25rem;
-    margin-top: 0.5rem;
+    gap: var(--space-1);
+    margin-top: var(--space-2);
   }
 
   .history-entry:hover .entry-actions {

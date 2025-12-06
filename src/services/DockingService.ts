@@ -124,9 +124,9 @@ export function useDockingService() {
 
     const baseStyle = {
       position: "absolute",
-      background: "rgba(59, 130, 246, 0.3)",
-      border: "2px dashed rgba(59, 130, 246, 0.8)",
-      borderRadius: "4px",
+      background: "rgba(245, 158, 11, 0.15)",
+      border: "2px dashed rgba(245, 158, 11, 0.8)",
+      borderRadius: "8px",
       pointerEvents: "none",
       zIndex: "1000",
     }

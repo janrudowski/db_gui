@@ -26,37 +26,23 @@
 <template>
   <div id="app-root">
     <ConfirmDialog />
-    <router-view />
+    <router-view v-slot="{ Component }">
+      <transition name="page" mode="out-in">
+        <component :is="Component" />
+      </transition>
+    </router-view>
   </div>
 </template>
 
 <style>
-  *,
-  *::before,
-  *::after {
-    margin: 0;
-    padding: 0;
-    box-sizing: border-box;
+  /* User select rules */
+  *:not(input):not(textarea):not([contenteditable="true"]):not(
+      .monaco-editor *
+    ):not(.p-datatable-tbody td):not(.p-datatable-tbody .cell-value):not(
+      pre
+    ):not(code) {
     user-select: none !important;
     -webkit-user-select: none !important;
-  }
-
-  html,
-  body,
-  #app,
-  #app-root {
-    height: 100%;
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
-      Helvetica, Arial, sans-serif;
-  }
-
-  body {
-    background: var(--p-surface-ground);
-    color: var(--p-text-color);
-  }
-
-  html.dark-mode {
-    color-scheme: dark;
   }
 
   input,
@@ -70,5 +56,25 @@
   code {
     user-select: text !important;
     -webkit-user-select: text !important;
+  }
+
+  html.dark-mode {
+    color-scheme: dark;
+  }
+
+  /* Page transition */
+  .page-enter-active,
+  .page-leave-active {
+    transition: opacity 0.15s ease, transform 0.15s ease;
+  }
+
+  .page-enter-from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+
+  .page-leave-to {
+    opacity: 0;
+    transform: translateY(-4px);
   }
 </style>

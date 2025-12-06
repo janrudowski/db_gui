@@ -58,11 +58,19 @@
     { deep: true }
   )
 
+  function clearDockingState() {
+    if (dockingService.dragState.dropPosition) {
+      dockingService.dragState.targetPaneId = null
+      dockingService.dragState.dropPosition = null
+    }
+  }
+
   function onDragStart(event: any) {
     console.log("[TabBar] onDragStart FIRED", {
       paneId: props.paneId,
       event,
-      localTabsBefore: localTabs.value.map((t) => t.id),
+      item: event.item,
+      oldIndex: event.oldIndex,
     })
     isDragging.value = true
     const draggedTab = localTabs.value[event.oldIndex]
@@ -258,6 +266,7 @@
       @start="onDragStart"
       @end="onDragEnd"
       @change="handleDragChange"
+      @dragover.native="clearDockingState"
     >
       <template #item="{ element: tab }">
         <div
@@ -289,31 +298,51 @@
     display: flex;
     background: var(--p-surface-100);
     border-bottom: 1px solid var(--p-surface-200);
-    min-height: 36px;
+    min-height: 38px;
   }
 
   .tab-list {
     display: flex;
     flex: 1;
     overflow-x: auto;
-    gap: 2px;
-    padding: 4px 4px 0;
+    gap: 1px;
+    padding: 6px 6px 0;
+  }
+
+  /* Hide scrollbar but keep functionality */
+  .tab-list::-webkit-scrollbar {
+    height: 0;
   }
 
   .tab {
     display: flex;
     align-items: center;
-    gap: 6px;
-    padding: 6px 12px;
+    gap: var(--space-2);
+    padding: var(--space-2) var(--space-3);
     background: var(--p-surface-50);
     border: 1px solid var(--p-surface-200);
     border-bottom: none;
-    border-radius: 6px 6px 0 0;
+    border-radius: var(--radius-md) var(--radius-md) 0 0;
     cursor: grab;
-    font-size: 0.85rem;
+    font-size: 0.8rem;
+    font-weight: 500;
     white-space: nowrap;
-    transition: background 0.15s;
-    -webkit-user-drag: element;
+    transition: background var(--transition-fast), color var(--transition-fast),
+      border-color var(--transition-fast);
+    color: var(--p-text-muted-color);
+    position: relative;
+  }
+
+  .tab::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 2px;
+    background: transparent;
+    border-radius: 2px 2px 0 0;
+    transition: background var(--transition-fast);
   }
 
   .tab:active {
@@ -322,17 +351,28 @@
 
   .tab:hover {
     background: var(--p-surface-0);
+    color: var(--p-text-color);
   }
 
   .tab.active {
     background: var(--p-surface-0);
     border-color: var(--p-primary-color);
-    border-bottom: 1px solid var(--p-surface-0);
+    color: var(--p-text-color);
     margin-bottom: -1px;
+    border-bottom: 1px solid var(--p-surface-0);
+  }
+
+  .tab.active::before {
+    background: var(--p-primary-color);
+  }
+
+  .tab i {
+    font-size: 0.85rem;
+    opacity: 0.8;
   }
 
   .tab-title {
-    max-width: 150px;
+    max-width: 140px;
     overflow: hidden;
     text-overflow: ellipsis;
   }
@@ -341,43 +381,69 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    width: 18px;
-    height: 18px;
+    width: 16px;
+    height: 16px;
     border: none;
     background: transparent;
-    border-radius: 4px;
+    border-radius: var(--radius-sm);
     cursor: pointer;
+    opacity: 0;
+    transition: all var(--transition-fast);
+    color: var(--p-text-muted-color);
+    margin-left: var(--space-1);
+  }
+
+  .tab:hover .close-btn {
     opacity: 0.6;
-    transition: all 0.15s;
   }
 
   .close-btn:hover {
     background: var(--p-surface-200);
     opacity: 1;
+    color: var(--danger);
   }
 
   .close-btn i {
-    font-size: 0.7rem;
+    font-size: 0.65rem;
+    opacity: 1;
   }
 
   .dirty-indicator {
-    color: var(--p-orange-500);
-    font-size: 0.6rem;
-    margin-left: -4px;
+    color: var(--p-primary-color);
+    font-size: 0.5rem;
+    margin-left: -2px;
+    animation: pulse 2s ease-in-out infinite;
+  }
+
+  @keyframes pulse {
+    0%,
+    100% {
+      opacity: 1;
+    }
+    50% {
+      opacity: 0.5;
+    }
   }
 
   .tab.dirty .tab-title {
     font-style: italic;
   }
 
-  .ghost-tab {
+  .tab.dirty::before {
+    background: var(--p-primary-color);
     opacity: 0.5;
-    background: var(--p-primary-100);
+  }
+
+  .ghost-tab {
+    opacity: 0.4;
+    background: rgba(245, 158, 11, 0.1);
+    border-color: var(--p-primary-color);
   }
 
   .dragging-tab {
-    opacity: 0.8;
-    background: var(--p-primary-200);
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    opacity: 0.9;
+    background: var(--p-surface-0);
+    box-shadow: var(--shadow-lg);
+    border-color: var(--p-primary-color);
   }
 </style>

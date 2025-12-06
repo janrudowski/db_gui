@@ -11,7 +11,7 @@ export const useThemeStore = defineStore("theme", () => {
     } else if (saved === "light") {
       isDark.value = false
     } else {
-      isDark.value = false
+      isDark.value = true
     }
     applyTheme()
   }

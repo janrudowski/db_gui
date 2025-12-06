@@ -15,6 +15,7 @@ export const useConnectionsStore = defineStore("connections", () => {
   const activeConnectionId = ref<string | null>(null)
   const schemas = ref<Map<string, SchemaInfo[]>>(new Map())
   const tables = ref<Map<string, TableInfo[]>>(new Map())
+  const columns = ref<Map<string, ColumnInfo[]>>(new Map())
   const loading = ref(false)
   const error = ref<string | null>(null)
 
@@ -108,11 +109,30 @@ export const useConnectionsStore = defineStore("connections", () => {
     schema: string,
     table: string
   ): Promise<ColumnInfo[]> {
-    return await invoke<ColumnInfo[]>("get_columns", {
+    const key = `${connectionId}:${schema}:${table}`
+    const cached = columns.value.get(key)
+    if (cached) return cached
+
+    const result = await invoke<ColumnInfo[]>("get_columns", {
       connectionId,
       schema,
       table,
     })
+    columns.value.set(key, result)
+    return result
+  }
+
+  function getCachedColumns(
+    connectionId: string,
+    schema: string,
+    table: string
+  ): ColumnInfo[] {
+    const key = `${connectionId}:${schema}:${table}`
+    return columns.value.get(key) || []
+  }
+
+  function getAllCachedColumns(): Map<string, ColumnInfo[]> {
+    return columns.value
   }
 
   return {
@@ -121,6 +141,7 @@ export const useConnectionsStore = defineStore("connections", () => {
     activeConnection,
     schemas,
     tables,
+    columns,
     loading,
     error,
     loadConnections,
@@ -134,5 +155,7 @@ export const useConnectionsStore = defineStore("connections", () => {
     getSchemas,
     getTables,
     getColumns,
+    getCachedColumns,
+    getAllCachedColumns,
   }
 })

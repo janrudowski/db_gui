@@ -6,6 +6,7 @@
     shallowRef,
     computed,
     nextTick,
+    watch,
   } from "vue"
   import { invoke } from "@tauri-apps/api/core"
   import { useToast } from "primevue/usetoast"
@@ -75,10 +76,41 @@
         schema.name
       )
       tables.set(schema.name, schemaTables)
+
+      for (const table of schemaTables) {
+        const tableColumns = connectionsStore.getCachedColumns(
+          props.connectionId,
+          schema.name,
+          table.name
+        )
+        if (tableColumns.length > 0) {
+          columns.set(`${schema.name}:${table.name}`, tableColumns)
+        }
+      }
     }
 
     return { schemas, tables, columns }
   }
+
+  function updateCompletionProvider() {
+    console.log("[SqlEditor] updateCompletionProvider called")
+    completionDisposable.value?.dispose()
+    const metadata = buildSchemaMetadata()
+    console.log("[SqlEditor] Built metadata:", {
+      schemas: metadata.schemas.length,
+      tables: metadata.tables.size,
+      columns: metadata.columns.size,
+    })
+    completionDisposable.value = registerSqlCompletionProvider(metadata)
+  }
+
+  watch(
+    () => connectionsStore.columns,
+    () => {
+      updateCompletionProvider()
+    },
+    { deep: true }
+  )
 
   onMounted(() => {
     if (!editorContainer.value) return
@@ -105,8 +137,7 @@
       () => formatQuery()
     )
 
-    const metadata = buildSchemaMetadata()
-    completionDisposable.value = registerSqlCompletionProvider(metadata)
+    updateCompletionProvider()
   })
 
   onUnmounted(() => {
@@ -280,7 +311,6 @@
         icon="pi pi-play"
         @click="executeQuery"
         :loading="loading"
-        severity="success"
         size="small"
         v-tooltip.bottom="'Ctrl+Enter'"
       />
@@ -344,13 +374,17 @@
     display: flex;
     flex-direction: column;
     height: 100%;
+    background: var(--p-surface-0);
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+    border: 1px solid var(--p-surface-200);
   }
 
   .editor-toolbar {
     display: flex;
     align-items: center;
-    gap: 0.5rem;
-    padding: 0.5rem 0.75rem;
+    gap: var(--space-2);
+    padding: var(--space-3) var(--space-4);
     background: var(--p-surface-100);
     border-bottom: 1px solid var(--p-surface-200);
   }
@@ -362,12 +396,18 @@
   .execution-info {
     display: flex;
     align-items: center;
-    gap: 0.35rem;
+    gap: var(--space-2);
     font-size: 0.8rem;
-    color: var(--p-text-muted-color);
-    padding: 0.25rem 0.5rem;
+    font-family: var(--font-mono);
+    color: var(--p-text-color);
+    padding: var(--space-1) var(--space-3);
     background: var(--p-surface-200);
-    border-radius: 4px;
+    border-radius: var(--radius-md);
+  }
+
+  .execution-info i {
+    color: var(--p-text-muted-color);
+    font-size: 0.75rem;
   }
 
   .split-content {
@@ -375,9 +415,18 @@
     overflow: hidden;
   }
 
+  :deep(.split-content .splitpanes__splitter) {
+    background: var(--p-surface-200);
+  }
+
+  :deep(.split-content .splitpanes__splitter:hover) {
+    background: var(--p-primary-color);
+  }
+
   .editor-container {
     height: 100%;
     overflow: hidden;
+    background: var(--p-surface-ground);
   }
 
   .results-panel {
@@ -385,25 +434,29 @@
     overflow: hidden;
     display: flex;
     flex-direction: column;
+    background: var(--p-surface-ground);
   }
 
   .error-message {
     display: flex;
     align-items: flex-start;
-    gap: 0.75rem;
-    padding: 1rem;
-    margin: 0.5rem;
-    background: var(--p-red-900);
-    color: var(--p-red-100);
-    border-radius: 6px;
-    font-family: monospace;
+    gap: var(--space-3);
+    padding: var(--space-4);
+    margin: var(--space-3);
+    background: rgba(239, 68, 68, 0.1);
+    border: 1px solid rgba(239, 68, 68, 0.3);
+    color: var(--danger);
+    border-radius: var(--radius-lg);
+    font-family: var(--font-mono);
     font-size: 0.85rem;
     white-space: pre-wrap;
+    line-height: 1.5;
   }
 
   .error-message i {
-    color: var(--p-red-400);
+    color: var(--danger);
     font-size: 1.25rem;
+    flex-shrink: 0;
   }
 
   .no-results,
@@ -414,21 +467,36 @@
     justify-content: center;
     height: 100%;
     color: var(--p-text-muted-color);
+    gap: var(--space-2);
   }
 
-  .no-results i,
+  .no-results i {
+    font-size: 3rem;
+    color: var(--success);
+    opacity: 0.8;
+  }
+
   .placeholder i {
-    font-size: 2rem;
-    margin-bottom: 0.5rem;
+    font-size: 3rem;
+    opacity: 0.3;
+    color: var(--p-text-muted-color);
+  }
+
+  .no-results p,
+  .placeholder p {
+    margin: 0;
+    color: var(--p-text-muted-color);
   }
 
   .no-results .detail {
     font-size: 0.85rem;
-    opacity: 0.7;
+    color: var(--p-text-muted-color);
+    font-family: var(--font-mono);
   }
 
   .rows-info {
     font-size: 0.8rem;
     color: var(--p-text-muted-color);
+    font-family: var(--font-mono);
   }
 </style>

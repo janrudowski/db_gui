@@ -1,0 +1,786 @@
+/* 
+ * Obsidian Console Theme
+ * A sophisticated dark-mode database GUI aesthetic
+ */
+
+/* ============================================
+   FONTS - Import distinctive typography
+   ============================================ */
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap');
+
+/* ============================================
+   CSS CUSTOM PROPERTIES
+   ============================================ */
+:root {
+  /* Typography */
+  --font-ui: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-mono: 'JetBrains Mono', 'Fira Code', monospace;
+  
+  /* Base palette - Obsidian */
+  --obsidian-950: #050506;
+  --obsidian-900: #0a0a0c;
+  --obsidian-850: #0f0f12;
+  --obsidian-800: #141418;
+  --obsidian-750: #18181c;
+  --obsidian-700: #1c1c21;
+  --obsidian-600: #26262d;
+  --obsidian-500: #32323b;
+  --obsidian-400: #4a4a56;
+  --obsidian-300: #6b6b7a;
+  --obsidian-200: #9090a0;
+  --obsidian-100: #b8b8c5;
+  --obsidian-50: #e8e8ed;
+  
+  /* Accent - Amber */
+  --amber-500: #f59e0b;
+  --amber-400: #fbbf24;
+  --amber-300: #fcd34d;
+  --amber-600: #d97706;
+  --amber-700: #b45309;
+  --amber-glow: rgba(245, 158, 11, 0.15);
+  --amber-glow-strong: rgba(245, 158, 11, 0.25);
+  
+  /* Secondary accent - Cyan */
+  --cyan-500: #06b6d4;
+  --cyan-400: #22d3ee;
+  --cyan-300: #67e8f9;
+  --cyan-glow: rgba(6, 182, 212, 0.15);
+  
+  /* Semantic colors */
+  --success: #10b981;
+  --success-glow: rgba(16, 185, 129, 0.15);
+  --danger: #ef4444;
+  --danger-glow: rgba(239, 68, 68, 0.15);
+  --warning: #f59e0b;
+  --info: #06b6d4;
+  
+  /* Database type colors */
+  --db-postgresql: #336791;
+  --db-mysql: #00758f;
+  --db-sqlite: #003b57;
+  
+  /* Shadows */
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.5);
+  --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.6);
+  --shadow-glow-amber: 0 0 20px var(--amber-glow);
+  --shadow-glow-cyan: 0 0 20px var(--cyan-glow);
+  
+  /* Borders */
+  --border-subtle: 1px solid rgba(255, 255, 255, 0.06);
+  --border-default: 1px solid rgba(255, 255, 255, 0.1);
+  --border-strong: 1px solid rgba(255, 255, 255, 0.15);
+  
+  /* Transitions */
+  --transition-fast: 0.1s ease;
+  --transition-base: 0.2s ease;
+  --transition-slow: 0.3s ease;
+  
+  /* Spacing scale */
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-5: 1.25rem;
+  --space-6: 1.5rem;
+  --space-8: 2rem;
+  --space-10: 2.5rem;
+  --space-12: 3rem;
+  
+  /* Border radius */
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 8px;
+  --radius-xl: 12px;
+}
+
+/* ============================================
+   DARK MODE (Default) - PrimeVue Overrides
+   ============================================ */
+.dark-mode {
+  /* Surface colors */
+  --p-surface-0: var(--obsidian-800);
+  --p-surface-50: var(--obsidian-750);
+  --p-surface-100: var(--obsidian-700);
+  --p-surface-200: var(--obsidian-600);
+  --p-surface-300: var(--obsidian-500);
+  --p-surface-400: var(--obsidian-400);
+  --p-surface-500: var(--obsidian-300);
+  --p-surface-600: var(--obsidian-200);
+  --p-surface-700: var(--obsidian-100);
+  --p-surface-800: var(--obsidian-50);
+  --p-surface-900: #ffffff;
+  --p-surface-ground: var(--obsidian-900);
+  
+  /* Text colors */
+  --p-text-color: var(--obsidian-50);
+  --p-text-muted-color: var(--obsidian-300);
+  
+  /* Primary (Amber) */
+  --p-primary-50: #fffbeb;
+  --p-primary-100: #fef3c7;
+  --p-primary-200: #fde68a;
+  --p-primary-300: #fcd34d;
+  --p-primary-400: #fbbf24;
+  --p-primary-500: #f59e0b;
+  --p-primary-600: #d97706;
+  --p-primary-700: #b45309;
+  --p-primary-800: #92400e;
+  --p-primary-900: #78350f;
+  --p-primary-color: var(--amber-500);
+  --p-primary-contrast-color: var(--obsidian-950);
+  
+  /* Form colors */
+  --p-form-field-background: var(--obsidian-800);
+  --p-form-field-border-color: var(--obsidian-600);
+  --p-form-field-focus-border-color: var(--amber-500);
+  
+  /* Content area */
+  --p-content-background: var(--obsidian-800);
+  --p-content-border-color: var(--obsidian-600);
+  
+  /* Highlight */
+  --p-highlight-background: var(--amber-glow);
+  --p-highlight-color: var(--amber-400);
+  --p-highlight-focus-background: var(--amber-glow-strong);
+  --p-highlight-focus-color: var(--amber-300);
+
+  /* Theme-aware aliases for components */
+  --theme-bg-primary: var(--obsidian-800);
+  --theme-bg-secondary: var(--obsidian-850);
+  --theme-bg-tertiary: var(--obsidian-900);
+  --theme-border: var(--obsidian-700);
+  --theme-border-subtle: var(--obsidian-600);
+  --theme-text: var(--obsidian-50);
+  --theme-text-muted: var(--obsidian-300);
+  --theme-text-subtle: var(--obsidian-400);
+}
+
+/* ============================================
+   LIGHT MODE - PrimeVue Overrides
+   ============================================ */
+:root:not(.dark-mode) {
+  --p-surface-ground: #f8f9fa;
+  --p-surface-0: #ffffff;
+  --p-surface-50: #fafafa;
+  --p-surface-100: #f4f4f5;
+  --p-surface-200: #e4e4e7;
+  --p-surface-300: #d4d4d8;
+  --p-surface-400: #a1a1aa;
+  --p-surface-500: #71717a;
+  --p-surface-600: #52525b;
+  --p-surface-700: #3f3f46;
+  --p-surface-800: #27272a;
+  --p-surface-900: #18181b;
+  
+  --p-text-color: #18181b;
+  --p-text-muted-color: #71717a;
+  
+  --p-primary-color: var(--amber-600);
+  --p-primary-contrast-color: #ffffff;
+  
+  --p-form-field-background: #ffffff;
+  --p-form-field-border-color: #e4e4e7;
+  --p-form-field-focus-border-color: var(--amber-500);
+  
+  --p-content-background: #ffffff;
+  --p-content-border-color: #e4e4e7;
+
+  /* Theme-aware aliases for components */
+  --theme-bg-primary: #ffffff;
+  --theme-bg-secondary: #fafafa;
+  --theme-bg-tertiary: #f4f4f5;
+  --theme-border: #e4e4e7;
+  --theme-border-subtle: #d4d4d8;
+  --theme-text: #18181b;
+  --theme-text-muted: #71717a;
+  --theme-text-subtle: #a1a1aa;
+}
+
+/* ============================================
+   GLOBAL STYLES
+   ============================================ */
+*,
+*::before,
+*::after {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html,
+body,
+#app,
+#app-root {
+  height: 100%;
+  font-family: var(--font-ui);
+  font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+  background: var(--p-surface-ground);
+  color: var(--p-text-color);
+}
+
+/* Subtle noise texture for dark mode */
+.dark-mode body::before {
+  content: '';
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  opacity: 0.015;
+  z-index: 9999;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");
+}
+
+/* Selection styling */
+::selection {
+  background: var(--amber-glow-strong);
+  color: var(--amber-300);
+}
+
+/* Scrollbar styling - dark mode */
+.dark-mode ::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.dark-mode ::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.dark-mode ::-webkit-scrollbar-thumb {
+  background: var(--obsidian-500);
+  border-radius: 4px;
+}
+
+.dark-mode ::-webkit-scrollbar-thumb:hover {
+  background: var(--obsidian-400);
+}
+
+/* Focus styles */
+:focus-visible {
+  outline: 2px solid var(--amber-500);
+  outline-offset: 2px;
+}
+
+/* ============================================
+   TYPOGRAPHY UTILITIES
+   ============================================ */
+.font-mono {
+  font-family: var(--font-mono);
+}
+
+.font-ui {
+  font-family: var(--font-ui);
+}
+
+/* ============================================
+   PRIMEVUE COMPONENT OVERRIDES
+   ============================================ */
+
+/* Buttons */
+.dark-mode .p-button {
+  font-family: var(--font-ui);
+  font-weight: 500;
+  border-radius: var(--radius-md);
+  transition: all var(--transition-base);
+}
+
+.dark-mode .p-button:not(.p-button-text):not(.p-button-outlined):not(.p-button-link) {
+  box-shadow: var(--shadow-sm);
+}
+
+.dark-mode .p-button:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-md);
+}
+
+.dark-mode .p-button:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+.dark-mode .p-button.p-button-primary {
+  background: linear-gradient(135deg, var(--amber-500) 0%, var(--amber-600) 100%);
+  border-color: var(--amber-500);
+}
+
+.dark-mode .p-button.p-button-primary:hover:not(:disabled) {
+  background: linear-gradient(135deg, var(--amber-400) 0%, var(--amber-500) 100%);
+  box-shadow: var(--shadow-glow-amber);
+}
+
+.dark-mode .p-button.p-button-success {
+  background: linear-gradient(135deg, var(--success) 0%, #059669 100%);
+}
+
+.dark-mode .p-button.p-button-success:hover:not(:disabled) {
+  box-shadow: 0 0 20px var(--success-glow);
+}
+
+.dark-mode .p-button.p-button-danger {
+  background: linear-gradient(135deg, var(--danger) 0%, #dc2626 100%);
+}
+
+.dark-mode .p-button.p-button-danger:hover:not(:disabled) {
+  box-shadow: 0 0 20px var(--danger-glow);
+}
+
+.dark-mode .p-button.p-button-text {
+  color: var(--p-text-muted-color);
+}
+
+.dark-mode .p-button.p-button-text:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--p-text-color);
+}
+
+/* Outlined buttons - amber */
+.dark-mode .p-button.p-button-outlined {
+  border-color: var(--amber-500);
+  color: var(--amber-500);
+}
+
+.dark-mode .p-button.p-button-outlined:hover:not(:disabled) {
+  background: var(--amber-glow);
+  border-color: var(--amber-400);
+  color: var(--amber-400);
+}
+
+/* Light mode button overrides */
+.p-button {
+  font-family: var(--font-ui);
+}
+
+.p-button:not(.p-button-text):not(.p-button-outlined):not(.p-button-link):not(.p-button-success):not(.p-button-danger):not(.p-button-secondary) {
+  background: var(--amber-500);
+  border-color: var(--amber-500);
+}
+
+.p-button:not(.p-button-text):not(.p-button-outlined):not(.p-button-link):not(.p-button-success):not(.p-button-danger):not(.p-button-secondary):hover:not(:disabled) {
+  background: var(--amber-600);
+  border-color: var(--amber-600);
+}
+
+.p-button.p-button-outlined:not(.p-button-success):not(.p-button-danger):not(.p-button-secondary) {
+  border-color: var(--amber-500);
+  color: var(--amber-500);
+}
+
+.p-button.p-button-outlined:not(.p-button-success):not(.p-button-danger):not(.p-button-secondary):hover:not(:disabled) {
+  background: var(--amber-glow);
+  border-color: var(--amber-500);
+  color: var(--amber-500);
+}
+
+/* Toggle switch - amber for both modes */
+.p-toggleswitch.p-toggleswitch-checked .p-toggleswitch-slider {
+  background: var(--amber-500) !important;
+}
+
+.p-toggleswitch.p-toggleswitch-checked:hover .p-toggleswitch-slider {
+  background: var(--amber-600) !important;
+}
+
+.p-toggleswitch .p-toggleswitch-slider:hover {
+  background: var(--p-surface-300);
+}
+
+/* Input fields */
+.dark-mode .p-inputtext,
+.dark-mode .p-password-input,
+.dark-mode .p-select,
+.dark-mode .p-textarea,
+.dark-mode .p-inputnumber-input {
+  font-family: var(--font-ui);
+  background: var(--obsidian-850);
+  border: var(--border-default);
+  border-radius: var(--radius-md);
+  transition: all var(--transition-base);
+}
+
+.dark-mode .p-inputtext:focus,
+.dark-mode .p-password-input:focus,
+.dark-mode .p-select:focus,
+.dark-mode .p-textarea:focus,
+.dark-mode .p-inputnumber-input:focus {
+  border-color: var(--amber-500);
+  box-shadow: 0 0 0 3px var(--amber-glow);
+}
+
+/* Data tables */
+.dark-mode .p-datatable {
+  font-family: var(--font-ui);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  border: var(--border-subtle);
+}
+
+.dark-mode .p-datatable .p-datatable-header {
+  background: var(--obsidian-800);
+  border-bottom: var(--border-default);
+  padding: var(--space-3) var(--space-4);
+}
+
+.dark-mode .p-datatable .p-datatable-thead > tr > th {
+  background: var(--obsidian-750);
+  border-bottom: var(--border-strong);
+  font-weight: 600;
+  text-transform: uppercase;
+  font-size: 0.7rem;
+  letter-spacing: 0.05em;
+  color: var(--obsidian-200);
+  padding: var(--space-3) var(--space-4);
+}
+
+.dark-mode .p-datatable .p-datatable-tbody > tr {
+  background: var(--obsidian-800);
+  transition: background var(--transition-fast);
+}
+
+.dark-mode .p-datatable .p-datatable-tbody > tr:hover {
+  background: var(--obsidian-750);
+}
+
+.dark-mode .p-datatable .p-datatable-tbody > tr > td {
+  border-bottom: var(--border-subtle);
+  padding: var(--space-2) var(--space-4);
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+}
+
+.dark-mode .p-datatable .p-datatable-tbody > tr.p-row-odd {
+  background: var(--obsidian-850);
+}
+
+.dark-mode .p-datatable .p-datatable-tbody > tr.p-row-odd:hover {
+  background: var(--obsidian-750);
+}
+
+/* Cards */
+.dark-mode .p-card {
+  background: var(--obsidian-800);
+  border: var(--border-subtle);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-md);
+  transition: all var(--transition-base);
+}
+
+.dark-mode .p-card:hover {
+  border-color: rgba(255, 255, 255, 0.12);
+  box-shadow: var(--shadow-lg);
+}
+
+/* Dialog */
+.dark-mode .p-dialog {
+  background: var(--obsidian-800);
+  border: var(--border-default);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-lg);
+}
+
+.dark-mode .p-dialog .p-dialog-header {
+  background: var(--obsidian-750);
+  border-bottom: var(--border-default);
+  padding: var(--space-4) var(--space-5);
+}
+
+.dark-mode .p-dialog .p-dialog-title {
+  font-weight: 600;
+  font-size: 1.1rem;
+}
+
+.dark-mode .p-dialog .p-dialog-content {
+  padding: var(--space-5);
+}
+
+.dark-mode .p-dialog .p-dialog-footer {
+  background: var(--obsidian-850);
+  border-top: var(--border-subtle);
+  padding: var(--space-4) var(--space-5);
+}
+
+/* Toast */
+.dark-mode .p-toast .p-toast-message {
+  background: var(--obsidian-800);
+  border: var(--border-default);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+}
+
+.dark-mode .p-toast .p-toast-message.p-toast-message-success {
+  border-left: 4px solid var(--success);
+}
+
+.dark-mode .p-toast .p-toast-message.p-toast-message-error {
+  border-left: 4px solid var(--danger);
+}
+
+.dark-mode .p-toast .p-toast-message.p-toast-message-warn {
+  border-left: 4px solid var(--warning);
+}
+
+.dark-mode .p-toast .p-toast-message.p-toast-message-info {
+  border-left: 4px solid var(--info);
+}
+
+/* Tree */
+.dark-mode .p-tree {
+  background: transparent;
+  border: none;
+  font-family: var(--font-ui);
+  padding: 0;
+}
+
+.dark-mode .p-tree .p-tree-node {
+  padding: 0;
+}
+
+.dark-mode .p-tree .p-tree-node-content {
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-md);
+  transition: all var(--transition-fast);
+}
+
+.dark-mode .p-tree .p-tree-node-content:hover {
+  background: var(--obsidian-700);
+}
+
+.dark-mode .p-tree .p-tree-node-content.p-highlight {
+  background: var(--amber-glow);
+  color: var(--amber-400);
+}
+
+.dark-mode .p-tree .p-tree-node-icon {
+  color: var(--obsidian-300);
+  margin-right: var(--space-2);
+}
+
+.dark-mode .p-tree .p-tree-node-label {
+  font-size: 0.85rem;
+}
+
+/* Context Menu */
+.dark-mode .p-contextmenu {
+  background: var(--obsidian-800);
+  border: var(--border-default);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+  padding: var(--space-2);
+  min-width: 180px;
+}
+
+.dark-mode .p-contextmenu .p-menuitem {
+  margin: 0;
+}
+
+.dark-mode .p-contextmenu .p-menuitem-link {
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-md);
+  transition: all var(--transition-fast);
+}
+
+.dark-mode .p-contextmenu .p-menuitem-link:hover {
+  background: var(--obsidian-700);
+}
+
+.dark-mode .p-contextmenu .p-menuitem-icon {
+  color: var(--obsidian-300);
+  margin-right: var(--space-3);
+}
+
+.dark-mode .p-contextmenu .p-menuitem-text {
+  font-size: 0.85rem;
+}
+
+/* Tabs */
+.dark-mode .p-tabview .p-tabview-nav {
+  background: var(--obsidian-800);
+  border-bottom: var(--border-default);
+}
+
+.dark-mode .p-tabview .p-tabview-nav-link {
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: var(--obsidian-300);
+  font-weight: 500;
+  font-size: 0.85rem;
+  padding: var(--space-3) var(--space-4);
+  transition: all var(--transition-base);
+}
+
+.dark-mode .p-tabview .p-tabview-nav-link:hover {
+  color: var(--p-text-color);
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.dark-mode .p-tabview .p-tabview-nav-link.p-tabview-nav-link-active {
+  color: var(--amber-400);
+  border-bottom-color: var(--amber-500);
+}
+
+.dark-mode .p-tabview .p-tabview-panels {
+  background: transparent;
+  padding: 0;
+}
+
+/* Select/Dropdown */
+.dark-mode .p-select-panel {
+  background: var(--obsidian-800);
+  border: var(--border-default);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+}
+
+.dark-mode .p-select-option {
+  padding: var(--space-2) var(--space-3);
+  transition: all var(--transition-fast);
+}
+
+.dark-mode .p-select-option:hover {
+  background: var(--obsidian-700);
+}
+
+.dark-mode .p-select-option.p-highlight {
+  background: var(--amber-glow);
+  color: var(--amber-400);
+}
+
+/* Progress Spinner */
+.dark-mode .p-progress-spinner-circle {
+  stroke: var(--amber-500);
+}
+
+/* Tag */
+.dark-mode .p-tag {
+  font-family: var(--font-ui);
+  font-weight: 600;
+  font-size: 0.7rem;
+  letter-spacing: 0.025em;
+  border-radius: var(--radius-sm);
+  padding: var(--space-1) var(--space-2);
+}
+
+.dark-mode .p-tag.p-tag-warn {
+  background: var(--amber-glow-strong);
+  color: var(--amber-400);
+}
+
+/* Toggle Switch */
+.dark-mode .p-toggleswitch.p-toggleswitch-checked .p-toggleswitch-slider {
+  background: var(--amber-500);
+}
+
+/* Tooltip */
+.p-tooltip {
+  max-width: none !important;
+}
+
+.p-tooltip .p-tooltip-text {
+  white-space: nowrap;
+  font-size: 0.8rem;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-md);
+}
+
+.dark-mode .p-tooltip .p-tooltip-text {
+  background: var(--obsidian-700);
+  border: var(--border-subtle);
+}
+
+/* Message */
+.dark-mode .p-message {
+  border-radius: var(--radius-lg);
+  margin: var(--space-4) 0;
+}
+
+.dark-mode .p-message.p-message-success {
+  background: var(--success-glow);
+  border-left: 4px solid var(--success);
+  color: #34d399;
+}
+
+.dark-mode .p-message.p-message-error {
+  background: var(--danger-glow);
+  border-left: 4px solid var(--danger);
+  color: #f87171;
+}
+
+/* Confirm Dialog */
+.dark-mode .p-confirm-dialog .p-confirm-dialog-icon {
+  color: var(--warning);
+}
+
+/* ============================================
+   ANIMATION UTILITIES
+   ============================================ */
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes slideUp {
+  from { 
+    opacity: 0; 
+    transform: translateY(10px); 
+  }
+  to { 
+    opacity: 1; 
+    transform: translateY(0); 
+  }
+}
+
+@keyframes slideIn {
+  from { 
+    opacity: 0; 
+    transform: translateX(-10px); 
+  }
+  to { 
+    opacity: 1; 
+    transform: translateX(0); 
+  }
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.6; }
+}
+
+@keyframes glow {
+  0%, 100% { box-shadow: 0 0 5px var(--amber-glow); }
+  50% { box-shadow: 0 0 20px var(--amber-glow-strong); }
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.3s ease;
+}
+
+.animate-slide-up {
+  animation: slideUp 0.3s ease;
+}
+
+.animate-slide-in {
+  animation: slideIn 0.3s ease;
+}
+
+.animate-pulse {
+  animation: pulse 2s ease-in-out infinite;
+}
+
+.animate-glow {
+  animation: glow 2s ease-in-out infinite;
+}
+
+/* Stagger delays for lists */
+.stagger-1 { animation-delay: 0.05s; }
+.stagger-2 { animation-delay: 0.1s; }
+.stagger-3 { animation-delay: 0.15s; }
+.stagger-4 { animation-delay: 0.2s; }
+.stagger-5 { animation-delay: 0.25s; }

@@ -159,7 +159,7 @@
     const relX = (event.clientX - rect.x) / rect.width
     const relY = (event.clientY - rect.y) / rect.height
 
-    const EDGE = 0.08
+    const EDGE = 0.18
     let newPosition: DockPosition = null
 
     if (relX > 1 - EDGE) {
@@ -281,18 +281,23 @@
     flex-direction: column;
     height: 100%;
     background: var(--p-surface-0);
-    border: 2px solid transparent;
-    border-radius: 4px;
+    border: 1px solid var(--p-surface-200);
+    border-radius: var(--radius-lg);
     overflow: hidden;
+    position: relative;
+    transition: border-color var(--transition-fast),
+      box-shadow var(--transition-fast);
   }
 
   .workspace-pane.active {
     border-color: var(--p-primary-color);
+    box-shadow: 0 0 0 1px rgba(245, 158, 11, 0.15), var(--shadow-md);
   }
 
   .pane-content {
     flex: 1;
     overflow: hidden;
+    background: var(--p-surface-ground);
   }
 
   .empty-pane {
@@ -302,29 +307,36 @@
     justify-content: center;
     height: 100%;
     color: var(--p-text-muted-color);
+    gap: var(--space-2);
   }
 
   .empty-pane i {
-    font-size: 3rem;
-    margin-bottom: 1rem;
+    font-size: 4rem;
+    opacity: 0.3;
+    color: var(--p-text-muted-color);
   }
 
   .empty-pane p {
-    margin: 0.25rem 0;
+    margin: 0;
+    font-size: 1rem;
+    color: var(--p-text-muted-color);
   }
 
   .empty-pane .hint {
     font-size: 0.85rem;
+    color: var(--p-text-muted-color);
+    max-width: 280px;
+    text-align: center;
+    line-height: 1.4;
     opacity: 0.7;
-  }
-
-  .workspace-pane {
-    position: relative;
   }
 
   .drop-indicator {
     position: absolute;
     pointer-events: none;
     z-index: 1000;
+    background: rgba(245, 158, 11, 0.15);
+    border: 2px dashed var(--p-primary-color);
+    border-radius: var(--radius-md);
   }
 </style>

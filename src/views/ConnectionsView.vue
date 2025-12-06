@@ -273,7 +273,6 @@
             <Button
               label="Connect"
               icon="pi pi-link"
-              severity="success"
               size="small"
               @click.stop="connectToDatabase(conn)"
             />
@@ -391,26 +390,30 @@
 
 <style scoped>
   .connections-view {
-    padding: 2rem;
-    max-width: 1200px;
+    min-height: 100vh;
+    padding: var(--space-8);
+    max-width: 1400px;
     margin: 0 auto;
+    animation: fadeIn 0.4s ease;
   }
 
   .header {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-bottom: 2rem;
+    margin-bottom: var(--space-8);
   }
 
   .header h1 {
     margin: 0;
-    font-size: 1.75rem;
-    font-weight: 600;
+    font-size: 2rem;
+    font-weight: 700;
+    color: var(--p-text-color);
+    letter-spacing: -0.02em;
   }
 
   .search-bar {
-    margin-bottom: 1.5rem;
+    margin-bottom: var(--space-6);
     max-width: 400px;
   }
 
@@ -422,116 +425,166 @@
     display: flex;
     flex-direction: column;
     align-items: center;
-    padding: 3rem;
+    padding: var(--space-12);
     color: var(--p-text-muted-color);
-    gap: 0.5rem;
+    gap: var(--space-3);
+    animation: slideUp 0.3s ease;
   }
 
   .no-results i {
-    font-size: 2rem;
+    font-size: 3rem;
+    opacity: 0.5;
   }
 
   .no-results p {
     margin: 0;
+    font-size: 1rem;
   }
 
   .loading-state {
     display: flex;
     justify-content: center;
     align-items: center;
-    padding: 4rem;
+    padding: var(--space-12);
   }
 
   .empty-state {
     display: flex;
     flex-direction: column;
     align-items: center;
-    padding: 4rem 2rem;
+    padding: var(--space-12) var(--space-8);
     text-align: center;
     background: var(--p-surface-50);
-    border-radius: 12px;
+    border-radius: var(--radius-xl);
     border: 2px dashed var(--p-surface-200);
+    animation: slideUp 0.4s ease;
   }
 
   .empty-icon {
-    width: 80px;
-    height: 80px;
+    width: 100px;
+    height: 100px;
     border-radius: 50%;
     background: var(--p-surface-100);
     display: flex;
     align-items: center;
     justify-content: center;
-    margin-bottom: 1rem;
+    margin-bottom: var(--space-6);
+    border: 1px solid var(--p-surface-200);
   }
 
   .empty-icon i {
-    font-size: 2.5rem;
-    color: var(--p-text-muted-color);
+    font-size: 3rem;
+    color: var(--amber-500);
+    opacity: 0.8;
   }
 
   .empty-state h2 {
-    margin: 0 0 0.5rem 0;
-    font-size: 1.25rem;
+    margin: 0 0 var(--space-2) 0;
+    font-size: 1.5rem;
+    font-weight: 600;
     color: var(--p-text-color);
   }
 
   .empty-state p {
-    margin: 0 0 1.5rem 0;
+    margin: 0 0 var(--space-6) 0;
     color: var(--p-text-muted-color);
+    font-size: 1rem;
   }
 
   .connections-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
-    gap: 1.5rem;
+    grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+    gap: var(--space-5);
   }
 
   .connection-card {
     cursor: pointer;
-    transition: all 0.2s ease;
+    transition: all var(--transition-base);
     border: 1px solid var(--p-surface-200);
     overflow: hidden;
+    background: var(--p-surface-0);
+    animation: slideUp 0.3s ease backwards;
+  }
+
+  .connection-card:nth-child(1) {
+    animation-delay: 0.05s;
+  }
+  .connection-card:nth-child(2) {
+    animation-delay: 0.1s;
+  }
+  .connection-card:nth-child(3) {
+    animation-delay: 0.15s;
+  }
+  .connection-card:nth-child(4) {
+    animation-delay: 0.2s;
+  }
+  .connection-card:nth-child(5) {
+    animation-delay: 0.25s;
+  }
+  .connection-card:nth-child(6) {
+    animation-delay: 0.3s;
   }
 
   .connection-card:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
-    border-color: var(--p-primary-color);
+    transform: translateY(-4px);
+    box-shadow: var(--shadow-lg), 0 0 30px rgba(245, 158, 11, 0.1);
+    border-color: var(--amber-500);
   }
 
   .card-header {
     display: flex;
     align-items: center;
-    gap: 0.75rem;
-    padding: 1rem 1.25rem;
+    gap: var(--space-4);
+    padding: var(--space-4) var(--space-5);
     background: var(--p-surface-50);
     border-bottom: 3px solid;
   }
 
   .db-icon {
-    width: 40px;
-    height: 40px;
-    border-radius: 8px;
+    width: 48px;
+    height: 48px;
+    border-radius: var(--radius-lg);
     display: flex;
     align-items: center;
     justify-content: center;
+    box-shadow: var(--shadow-md);
+    position: relative;
+    overflow: hidden;
+  }
+
+  .db-icon::after {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: linear-gradient(
+      135deg,
+      rgba(255, 255, 255, 0.2) 0%,
+      transparent 50%
+    );
   }
 
   .db-icon i {
-    font-size: 1.25rem;
+    font-size: 1.5rem;
     color: white;
+    z-index: 1;
   }
 
   .db-type-badge {
-    font-size: 0.8rem;
-    font-weight: 600;
+    font-size: 0.7rem;
+    font-weight: 700;
     text-transform: uppercase;
-    letter-spacing: 0.5px;
+    letter-spacing: 0.1em;
     color: var(--p-text-muted-color);
+    background: var(--p-surface-100);
+    padding: var(--space-1) var(--space-2);
+    border-radius: var(--radius-sm);
   }
 
   .card-title {
-    font-size: 1.1rem;
+    font-size: 1.15rem;
     font-weight: 600;
     color: var(--p-text-color);
     white-space: nowrap;
@@ -542,52 +595,84 @@
   .connection-details {
     display: flex;
     flex-direction: column;
-    gap: 0.5rem;
+    gap: var(--space-2);
   }
 
   .detail-row {
     display: flex;
     align-items: center;
-    gap: 0.5rem;
-    font-size: 0.9rem;
+    gap: var(--space-3);
+    font-size: 0.85rem;
     color: var(--p-text-muted-color);
+    transition: color var(--transition-fast);
+  }
+
+  .connection-card:hover .detail-row {
+    color: var(--p-text-color);
   }
 
   .detail-row i {
     font-size: 0.85rem;
-    width: 16px;
+    width: 18px;
     text-align: center;
+    color: var(--p-text-muted-color);
   }
 
   .database-name {
-    font-family: "JetBrains Mono", "Fira Code", monospace;
-    font-size: 0.85rem;
+    font-family: var(--font-mono);
+    font-size: 0.8rem;
+    color: var(--cyan-400);
   }
 
   .card-actions {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding-top: 0.5rem;
+    padding-top: var(--space-3);
+    border-top: 1px solid var(--p-surface-200);
+    margin-top: var(--space-3);
   }
 
   .form-grid {
     display: flex;
     flex-direction: column;
-    gap: 1rem;
+    gap: var(--space-4);
   }
 
   .field {
     display: flex;
     flex-direction: column;
-    gap: 0.5rem;
+    gap: var(--space-2);
   }
 
   .field label {
     font-weight: 500;
+    font-size: 0.85rem;
+    color: var(--p-text-muted-color);
   }
 
   .w-full {
     width: 100%;
+  }
+
+  /* Keyframes */
+  @keyframes fadeIn {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+
+  @keyframes slideUp {
+    from {
+      opacity: 0;
+      transform: translateY(16px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
   }
 </style>
