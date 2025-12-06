@@ -24,6 +24,14 @@ pub struct ColumnInfo {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct IndexInfo {
+    pub name: String,
+    pub columns: Vec<String>,
+    pub is_unique: bool,
+    pub is_primary: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TableData {
     pub columns: Vec<ColumnInfo>,
     pub rows: Vec<Vec<serde_json::Value>>,
@@ -185,6 +193,8 @@ pub trait DbConnection: Send + Sync {
     async fn get_tables(&self, schema: &str) -> DbResult<Vec<TableInfo>>;
 
     async fn get_columns(&self, schema: &str, table: &str) -> DbResult<Vec<ColumnInfo>>;
+
+    async fn get_indexes(&self, schema: &str, table: &str) -> DbResult<Vec<IndexInfo>>;
 
     async fn get_table_data(&self, params: FetchDataParams) -> DbResult<TableData>;
 

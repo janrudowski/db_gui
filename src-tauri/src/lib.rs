@@ -5,9 +5,9 @@ mod db;
 use commands::{
     alter_table, begin_transaction, commit_transaction, connect_to_database, create_schema,
     delete_connection, delete_row, disconnect_from_database, drop_schema, drop_table,
-    execute_query, export_data, get_columns, get_connections, get_distinct_values, get_schemas,
-    get_table_data, get_tables, get_transaction_status, insert_row, rollback_transaction,
-    save_connection, test_connection, update_row, AppState,
+    execute_query, export_data, get_columns, get_connections, get_distinct_values, get_indexes,
+    get_schemas, get_table_data, get_tables, get_transaction_status, insert_row,
+    rollback_transaction, save_connection, test_connection, update_row, AppState,
 };
 use tauri::Manager;
 
@@ -40,6 +40,7 @@ pub fn run() {
             get_schemas,
             get_tables,
             get_columns,
+            get_indexes,
             get_table_data,
             get_distinct_values,
             execute_query,

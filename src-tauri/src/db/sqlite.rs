@@ -190,6 +190,38 @@ impl DbConnection for SqliteConnection {
             .collect())
     }
 
+    async fn get_indexes(&self, _schema: &str, table: &str) -> DbResult<Vec<IndexInfo>> {
+        let query = format!("PRAGMA index_list(\"{}\")", table);
+        let rows = sqlx::query(&query)
+            .fetch_all(&self.pool)
+            .await
+            .map_err(|e| DbError::Query(e.to_string()))?;
+
+        let mut indexes = Vec::new();
+        for row in rows {
+            let index_name: String = row.get("name");
+            let unique: i32 = row.get("unique");
+            let origin: String = row.get("origin");
+
+            let col_query = format!("PRAGMA index_info(\"{}\")", index_name);
+            let col_rows = sqlx::query(&col_query)
+                .fetch_all(&self.pool)
+                .await
+                .map_err(|e| DbError::Query(e.to_string()))?;
+
+            let columns: Vec<String> = col_rows.iter().map(|r| r.get("name")).collect();
+
+            indexes.push(IndexInfo {
+                name: index_name,
+                columns,
+                is_unique: unique == 1,
+                is_primary: origin == "pk",
+            });
+        }
+
+        Ok(indexes)
+    }
+
     async fn get_table_data(&self, params: FetchDataParams) -> DbResult<TableData> {
         let columns = self.get_columns(&params.schema, &params.table).await?;
 

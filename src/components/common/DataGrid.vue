@@ -4,8 +4,8 @@
   import Column from "primevue/column"
   import InputText from "primevue/inputtext"
   import Button from "primevue/button"
-  import ContextMenu from "primevue/contextmenu"
   import Skeleton from "primevue/skeleton"
+  import ContextMenu from "primevue/contextmenu"
   import type { MenuItem } from "primevue/menuitem"
   import ColumnFilter, { type ColumnFilterValue } from "./ColumnFilter.vue"
   import {
@@ -101,9 +101,9 @@
   const filters = ref<Record<string, string>>({})
   const columnFilters = ref<Record<string, ColumnFilterValue>>({})
   const editingCells = ref<Record<string, Record<string, unknown>>>({})
-  const rowContextMenu = ref<InstanceType<typeof ContextMenu> | null>(null)
   const contextRow = ref<Record<string, unknown> | null>(null)
   const contextField = ref<string | null>(null)
+  const rowContextMenu = ref()
   const loadedRanges = ref<Set<string>>(new Set())
 
   const activeFilterCount = computed(() => {
@@ -140,18 +140,9 @@
         label: "Copy Row as...",
         icon: "pi pi-copy",
         items: [
-          {
-            label: "CSV",
-            command: () => copyRowAs("csv"),
-          },
-          {
-            label: "JSON",
-            command: () => copyRowAs("json"),
-          },
-          {
-            label: "SQL INSERT",
-            command: () => copyRowAs("sql"),
-          },
+          { label: "CSV", command: () => copyRowAs("csv") },
+          { label: "JSON", command: () => copyRowAs("json") },
+          { label: "SQL INSERT", command: () => copyRowAs("sql") },
         ],
       },
     ]
@@ -167,7 +158,6 @@
         {
           label: "Delete Row",
           icon: "pi pi-trash",
-          class: "p-menuitem-danger",
           command: () => contextRow.value && handleDeleteRow(contextRow.value),
         }
       )
@@ -192,14 +182,16 @@
     return items
   })
 
-  function onRowContextMenu(
+  function onCellContextMenu(
     event: MouseEvent,
     rowData: Record<string, unknown>,
     field?: string
   ) {
+    event.preventDefault()
+    event.stopPropagation()
     contextRow.value = rowData
     contextField.value = field || null
-    rowContextMenu.value?.show(event)
+    rowContextMenu.value.show(event)
   }
 
   function copyRowAs(format: "csv" | "json" | "sql") {
@@ -462,8 +454,8 @@
           <span
             v-if="slotProps.data && slotProps.data.__loaded !== false"
             :class="{ 'null-value': slotProps.data[slotProps.field as string] === null }"
-            @contextmenu.prevent="
-              onRowContextMenu(
+            @contextmenu="
+              onCellContextMenu(
                 $event,
                 slotProps.data,
                 slotProps.field as string

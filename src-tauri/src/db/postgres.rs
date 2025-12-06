@@ -15,7 +15,8 @@ impl PostgresConnection {
     pub async fn new(connection_string: &str) -> DbResult<Self> {
         let options = PgConnectOptions::from_str(connection_string)
             .map_err(|e| DbError::Connection(e.to_string()))?
-            .ssl_mode(sqlx::postgres::PgSslMode::Prefer);
+            .ssl_mode(sqlx::postgres::PgSslMode::Prefer)
+            .statement_cache_capacity(0);
 
         let pool = PgPoolOptions::new()
             .max_connections(10)
@@ -274,6 +275,44 @@ impl DbConnection for PostgresConnection {
                     is_nullable: nullable == "YES",
                     is_primary_key: row.get("is_primary_key"),
                     default_value: row.get("column_default"),
+                }
+            })
+            .collect())
+    }
+
+    async fn get_indexes(&self, schema: &str, table: &str) -> DbResult<Vec<IndexInfo>> {
+        let rows = sqlx::query(
+            r#"
+            SELECT 
+                i.relname as index_name,
+                ix.indisunique as is_unique,
+                ix.indisprimary as is_primary,
+                array_agg(a.attname ORDER BY array_position(ix.indkey, a.attnum)) as columns
+            FROM pg_class t
+            JOIN pg_index ix ON t.oid = ix.indrelid
+            JOIN pg_class i ON i.oid = ix.indexrelid
+            JOIN pg_namespace n ON n.oid = t.relnamespace
+            JOIN pg_attribute a ON a.attrelid = t.oid AND a.attnum = ANY(ix.indkey)
+            WHERE n.nspname = $1 AND t.relname = $2
+            GROUP BY i.relname, ix.indisunique, ix.indisprimary
+            ORDER BY i.relname
+            "#,
+        )
+        .bind(schema)
+        .bind(table)
+        .fetch_all(&self.pool)
+        .await
+        .map_err(|e| DbError::Query(e.to_string()))?;
+
+        Ok(rows
+            .iter()
+            .map(|row| {
+                let columns: Vec<String> = row.get("columns");
+                IndexInfo {
+                    name: row.get("index_name"),
+                    columns,
+                    is_unique: row.get("is_unique"),
+                    is_primary: row.get("is_primary"),
                 }
             })
             .collect())

@@ -33,7 +33,7 @@
 
   const workspaceStore = useWorkspaceStore()
   const confirm = useConfirm()
-  const contextMenu = ref<InstanceType<typeof ContextMenu> | null>(null)
+  const contextMenu = ref()
   const contextTabId = ref<string | null>(null)
   const localTabs = ref<Tab[]>([...props.tabs])
   const isDragging = ref(false)
@@ -145,11 +145,40 @@
   }
 
   function onTabContextMenu(event: MouseEvent, tabId: string) {
-    event.preventDefault()
-    event.stopPropagation()
     contextTabId.value = tabId
-    contextMenu.value?.show(event)
+    contextMenu.value.show(event)
   }
+
+  const contextMenuItems = computed<MenuItem[]>(() => {
+    const idx = props.tabs.findIndex((t) => t.id === contextTabId.value)
+    const isLast = idx === props.tabs.length - 1
+
+    return [
+      {
+        label: "Close",
+        icon: "pi pi-times",
+        command: () => contextTabId.value && handleClose(contextTabId.value),
+      },
+      {
+        label: "Close Others",
+        icon: "pi pi-times-circle",
+        command: handleCloseOthers,
+        disabled: props.tabs.length <= 1,
+      },
+      {
+        label: "Close Saved",
+        icon: "pi pi-check-circle",
+        command: handleCloseSaved,
+        disabled: props.tabs.every((t) => t.isDirty),
+      },
+      {
+        label: "Close to the Right",
+        icon: "pi pi-arrow-right",
+        command: handleCloseToRight,
+        disabled: isLast,
+      },
+    ]
+  })
 
   function onMiddleClick(event: MouseEvent, tabId: string) {
     if (event.button === 1) {
@@ -212,36 +241,6 @@
       emit("close-to-right", contextTabId.value)
     }
   }
-
-  const contextMenuItems = computed<MenuItem[]>(() => [
-    {
-      label: "Close",
-      icon: "pi pi-times",
-      command: () => contextTabId.value && handleClose(contextTabId.value),
-    },
-    {
-      label: "Close Others",
-      icon: "pi pi-times-circle",
-      command: handleCloseOthers,
-      disabled: props.tabs.length <= 1,
-    },
-    {
-      label: "Close Saved",
-      icon: "pi pi-check-circle",
-      command: handleCloseSaved,
-      disabled: props.tabs.every((t) => t.isDirty),
-    },
-    {
-      label: "Close to the Right",
-      icon: "pi pi-arrow-right",
-      command: handleCloseToRight,
-      disabled: () => {
-        if (!contextTabId.value) return true
-        const idx = props.tabs.findIndex((t) => t.id === contextTabId.value)
-        return idx === props.tabs.length - 1
-      },
-    },
-  ])
 </script>
 
 <template>

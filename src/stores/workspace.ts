@@ -131,8 +131,13 @@ export const useWorkspaceStore = defineStore("workspace", () => {
 
   function closeActiveTab() {
     const pane = activePane.value
-    if (!pane || !pane.activeTabId) return
-    closeTab(pane.id, pane.activeTabId)
+    if (!pane) return
+
+    if (pane.activeTabId) {
+      closeTab(pane.id, pane.activeTabId)
+    } else if (pane.tabs.length === 0 && panes.value.length > 1) {
+      closePane(pane.id)
+    }
   }
 
   function nextTab() {
@@ -259,10 +264,16 @@ export const useWorkspaceStore = defineStore("workspace", () => {
     position: "left" | "right" | "top" | "bottom",
     tab?: Tab
   ) {
+    console.log("[WorkspaceStore] splitPane called", {
+      targetPaneId,
+      position,
+      tab: tab?.id,
+    })
     if (panes.value.length >= 4) return
 
     const direction =
       position === "top" || position === "bottom" ? "horizontal" : "vertical"
+    console.log("[WorkspaceStore] splitPane direction:", direction)
     splitDirection.value = direction
 
     const newPane: Pane = {

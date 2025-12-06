@@ -6,11 +6,18 @@
   import Column from "primevue/column"
   import InputText from "primevue/inputtext"
   import Button from "primevue/button"
+  import ContextMenu from "primevue/contextmenu"
+  import type { MenuItem } from "primevue/menuitem"
   import ExportDialog from "../export/ExportDialog.vue"
   import ValueInspector from "../common/ValueInspector.vue"
   import ColumnFilter, {
     type ColumnFilterValue,
   } from "../common/ColumnFilter.vue"
+  import {
+    rowToInsertSql,
+    rowToCsv,
+    rowToJson,
+  } from "../../utils/sql-generator"
   import type {
     TableData,
     SortColumn,
@@ -46,41 +53,35 @@
   const inspectorColumnType = ref("")
   const inspectorRowData = ref<Record<string, unknown> | null>(null)
 
-  const PAGE_SIZE = 100
-  const currentPage = ref(0)
+  const CHUNK_SIZE = 100
+  const ROW_HEIGHT = 40
   const serverFilters = ref<Record<string, ColumnFilterValue>>({})
   const dataTableRef = ref<InstanceType<typeof DataTable> | null>(null)
+  const rowContextMenu = ref()
+  const contextRow = ref<Record<string, unknown> | null>(null)
+  const contextField = ref<string | null>(null)
+
+  const rows = ref<Record<string, unknown>[]>([])
 
   const primaryKeyColumn = computed(() => {
     return tableData.value?.columns.find((c) => c.is_primary_key)?.name || null
   })
 
-  const rows = computed(() => {
-    if (!tableData.value) return []
-    return tableData.value.rows.map((row, index) => {
-      const obj: Record<string, unknown> = { __rowIndex: index }
-      tableData.value!.columns.forEach((col, colIndex) => {
-        obj[col.name] = row[colIndex]
-      })
-      return obj
-    })
-  })
-
   const displayRows = computed(() => {
-    const result = [...rows.value]
     if (newRow.value) {
-      result.unshift({ ...newRow.value, __rowIndex: -1 })
+      return [{ ...newRow.value, __rowIndex: -1 }, ...rows.value]
     }
-    return result
+    return rows.value
   })
 
   const activeFilterCount = computed(() => {
     return Object.values(filters.value).filter((v) => v.trim() !== "").length
   })
 
-  const virtualScrollerOptions = computed(() => ({
-    itemSize: 40,
-  }))
+  const virtualScrollerOptions = {
+    itemSize: ROW_HEIGHT,
+    numToleratedItems: 10,
+  }
 
   function parseFilterValue(column: string, value: string): FilterCondition {
     const trimmed = value.trim()
@@ -166,38 +167,60 @@
     }
   }
 
+  function getFilterParams(): {
+    sort: SortColumn[] | null
+    filters: FilterCondition[] | null
+  } {
+    const sort: SortColumn[] | undefined = sortField.value
+      ? [
+          {
+            column: sortField.value,
+            direction: sortOrder.value === 1 ? "asc" : "desc",
+          },
+        ]
+      : undefined
+
+    const filterConditions: FilterCondition[] = Object.entries(filters.value)
+      .filter(([_, value]) => value.trim() !== "")
+      .map(([column, value]) => parseFilterValue(column, value))
+
+    const serverFilterConditions: FilterCondition[] = Object.values(
+      serverFilters.value
+    )
+      .map((f) => convertServerFilter(f))
+      .filter((f): f is FilterCondition => f !== null)
+
+    const allFilters = [...filterConditions, ...serverFilterConditions]
+
+    return {
+      sort: sort || null,
+      filters: allFilters.length > 0 ? allFilters : null,
+    }
+  }
+
   async function loadData() {
     loading.value = true
     try {
-      const sort: SortColumn[] | undefined = sortField.value
-        ? [
-            {
-              column: sortField.value,
-              direction: sortOrder.value === 1 ? "asc" : "desc",
-            },
-          ]
-        : undefined
+      const { sort, filters: filterParams } = getFilterParams()
 
-      const filterConditions: FilterCondition[] = Object.entries(filters.value)
-        .filter(([_, value]) => value.trim() !== "")
-        .map(([column, value]) => parseFilterValue(column, value))
-
-      const serverFilterConditions: FilterCondition[] = Object.values(
-        serverFilters.value
-      )
-        .map((f) => convertServerFilter(f))
-        .filter((f): f is FilterCondition => f !== null)
-
-      const allFilters = [...filterConditions, ...serverFilterConditions]
-
-      tableData.value = await invoke<TableData>("get_table_data", {
+      const data = await invoke<TableData>("get_table_data", {
         connectionId: props.connectionId,
         schema: props.schema,
         table: props.table,
-        limit: PAGE_SIZE,
-        offset: currentPage.value * PAGE_SIZE,
-        sort: sort || null,
-        filters: allFilters.length > 0 ? allFilters : null,
+        limit: CHUNK_SIZE,
+        offset: 0,
+        sort,
+        filters: filterParams,
+      })
+
+      tableData.value = data
+
+      rows.value = data.rows.map((row, i) => {
+        const obj: Record<string, unknown> = { __rowIndex: i }
+        data.columns.forEach((col, colIndex) => {
+          obj[col.name] = row[colIndex]
+        })
+        return obj
       })
     } catch (e) {
       toast.add({
@@ -211,11 +234,6 @@
     }
   }
 
-  function onPage(event: { page: number }) {
-    currentPage.value = event.page
-    loadData()
-  }
-
   function onServerSort(event: {
     sortField?: string | ((item: unknown) => string)
     sortOrder?: number | null
@@ -227,7 +245,6 @@
       sortField.value = null
       sortOrder.value = 0
     }
-    currentPage.value = 0
     loadData()
   }
 
@@ -235,7 +252,6 @@
     filters: Record<string, ColumnFilterValue>
   }) {
     serverFilters.value = event.filters
-    currentPage.value = 0
     loadData()
   }
 
@@ -349,21 +365,37 @@
   }
 
   function applyFilter() {
-    currentPage.value = 0
     loadData()
   }
 
   function clearFilters() {
     filters.value = {}
-    currentPage.value = 0
     loadData()
+  }
+
+  function isAutoGeneratedDefault(defaultValue: unknown): boolean {
+    if (!defaultValue || typeof defaultValue !== "string") return false
+    const lower = defaultValue.toLowerCase()
+    return (
+      lower.includes("nextval(") ||
+      lower.includes("gen_random_uuid()") ||
+      lower.includes("uuid_generate") ||
+      lower.includes("now()") ||
+      lower.includes("current_timestamp") ||
+      lower.includes("current_date") ||
+      lower.includes("auto_increment")
+    )
   }
 
   function startNewRow() {
     if (!tableData.value) return
     newRow.value = {}
     for (const col of tableData.value.columns) {
-      newRow.value[col.name] = col.default_value || null
+      if (isAutoGeneratedDefault(col.default_value)) {
+        newRow.value[col.name] = null
+      } else {
+        newRow.value[col.name] = col.default_value || null
+      }
     }
     newRow.value.__isNew = true
   }
@@ -431,6 +463,102 @@
     return `SELECT * FROM ${q}${props.schema}${q}.${q}${props.table}${q}`
   }
 
+  const columnNames = computed(
+    () => tableData.value?.columns.map((c) => c.name) || []
+  )
+
+  const rowContextMenuItems = computed<MenuItem[]>(() => {
+    const items: MenuItem[] = [
+      {
+        label: "Copy Row as...",
+        icon: "pi pi-copy",
+        items: [
+          { label: "CSV", command: () => copyRowAs("csv") },
+          { label: "JSON", command: () => copyRowAs("json") },
+          { label: "SQL INSERT", command: () => copyRowAs("sql") },
+        ],
+      },
+      { separator: true },
+      {
+        label: "Delete Row",
+        icon: "pi pi-trash",
+        command: () => contextRow.value && deleteRow(contextRow.value),
+      },
+    ]
+
+    if (contextField.value) {
+      items.push(
+        { separator: true },
+        {
+          label: "Set to NULL",
+          icon: "pi pi-ban",
+          command: () => {
+            if (contextRow.value && contextField.value) {
+              const rowKey = String(contextRow.value.__rowIndex)
+              if (!editingRows.value[rowKey]) {
+                editingRows.value[rowKey] = {}
+              }
+              editingRows.value[rowKey][contextField.value] = null
+              contextRow.value[contextField.value] = null
+            }
+          },
+        },
+        {
+          label: "Inspect Value",
+          icon: "pi pi-search",
+          command: () => {
+            if (contextRow.value && contextField.value) {
+              openInspector(contextRow.value, contextField.value)
+            }
+          },
+        }
+      )
+    }
+
+    return items
+  })
+
+  function onCellContextMenu(
+    event: MouseEvent,
+    rowData: Record<string, unknown>,
+    field?: string
+  ) {
+    event.preventDefault()
+    event.stopPropagation()
+    contextRow.value = rowData
+    contextField.value = field || null
+    rowContextMenu.value.show(event)
+  }
+
+  function copyRowAs(format: "csv" | "json" | "sql") {
+    if (!contextRow.value) return
+
+    let text = ""
+    switch (format) {
+      case "csv":
+        text = rowToCsv(contextRow.value, columnNames.value)
+        break
+      case "json":
+        text = rowToJson(contextRow.value, columnNames.value)
+        break
+      case "sql":
+        text = rowToInsertSql(
+          props.schema,
+          props.table,
+          contextRow.value,
+          columnNames.value
+        )
+        break
+    }
+
+    navigator.clipboard.writeText(text)
+    toast.add({
+      severity: "success",
+      summary: "Copied to clipboard",
+      life: 2000,
+    })
+  }
+
   function openInspector(rowData: Record<string, unknown>, field: string) {
     const column = tableData.value?.columns.find((c) => c.name === field)
     inspectorRowData.value = rowData
@@ -465,7 +593,6 @@
   watch(
     () => [props.connectionId, props.schema, props.table],
     () => {
-      currentPage.value = 0
       filters.value = {}
       sortField.value = null
       sortOrder.value = 0
@@ -500,7 +627,7 @@
       if (editedRowKeys.length > 0) {
         const promises = editedRowKeys.map((rowKey) => {
           const row = displayRows.value.find(
-            (r) => String(r.__rowIndex) === rowKey
+            (r) => r && String(r.__rowIndex) === rowKey
           )
           if (row) return saveRow(row)
           return Promise.resolve()
@@ -597,11 +724,6 @@
       scrollable
       scroll-height="flex"
       :virtualScrollerOptions="virtualScrollerOptions"
-      :paginator="!newRow"
-      :rows="PAGE_SIZE"
-      :totalRecords="tableData?.total_count || 0"
-      :lazy="true"
-      @page="onPage"
       @sort="onServerSort"
       :sortField="sortField || undefined"
       :sortOrder="sortOrder"
@@ -674,6 +796,13 @@
           <span
             :class="{ 'null-value': slotProps.data[slotProps.field as string] === null }"
             @dblclick="openInspector(slotProps.data, slotProps.field as string)"
+            @contextmenu="
+              onCellContextMenu(
+                $event,
+                slotProps.data,
+                slotProps.field as string
+              )
+            "
             class="cell-value"
           >
             {{
@@ -749,6 +878,8 @@
       :editable="true"
       @save="handleInspectorSave"
     />
+
+    <ContextMenu ref="rowContextMenu" :model="rowContextMenuItems" />
   </div>
 </template>
 

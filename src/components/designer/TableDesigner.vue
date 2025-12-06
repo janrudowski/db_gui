@@ -10,7 +10,13 @@
   import DataTable from "primevue/datatable"
   import Column from "primevue/column"
   import Tag from "primevue/tag"
-  import type { ColumnInfo, DatabaseType, ColumnChange } from "../../types"
+  import MultiSelect from "primevue/multiselect"
+  import type {
+    ColumnInfo,
+    DatabaseType,
+    ColumnChange,
+    IndexInfo,
+  } from "../../types"
   import { useWorkspaceStore } from "../../stores/workspace"
   import { useConnectionsStore } from "../../stores/connections"
 
@@ -19,6 +25,16 @@
     status: "existing" | "added" | "modified" | "dropped"
     originalName?: string
     originalType?: string
+  }
+
+  interface EditableIndex {
+    id: string
+    name: string
+    columns: string[]
+    isUnique: boolean
+    isPrimary: boolean
+    status: "existing" | "added" | "dropped"
+    originalName?: string
   }
 
   const props = defineProps<{
@@ -40,6 +56,8 @@
   const saving = ref(false)
   const columns = ref<EditableColumn[]>([])
   const originalColumns = ref<ColumnInfo[]>([])
+  const indexes = ref<EditableIndex[]>([])
+  const originalIndexes = ref<EditableIndex[]>([])
 
   const connection = computed(() =>
     connectionsStore.connections.find((c) => c.id === props.connectionId)
@@ -102,13 +120,23 @@
   )
 
   const hasChanges = computed(() => {
-    return columns.value.some(
+    const columnChanges = columns.value.some(
       (c) =>
         c.status === "added" ||
         c.status === "modified" ||
         c.status === "dropped"
     )
+    const indexChanges = indexes.value.some(
+      (i) => i.status === "added" || i.status === "dropped"
+    )
+    return columnChanges || indexChanges
   })
+
+  const availableColumnNames = computed(() =>
+    columns.value
+      .filter((c) => c.name.trim() && c.status !== "dropped")
+      .map((c) => c.name)
+  )
 
   const pendingChanges = computed<ColumnChange[]>(() => {
     const changes: ColumnChange[] = []
@@ -152,11 +180,18 @@
   async function loadColumns() {
     loading.value = true
     try {
-      const cols = await invoke<ColumnInfo[]>("get_columns", {
-        connectionId: props.connectionId,
-        schema: props.schema,
-        table: props.table,
-      })
+      const [cols, idxs] = await Promise.all([
+        invoke<ColumnInfo[]>("get_columns", {
+          connectionId: props.connectionId,
+          schema: props.schema,
+          table: props.table,
+        }),
+        invoke<IndexInfo[]>("get_indexes", {
+          connectionId: props.connectionId,
+          schema: props.schema,
+          table: props.table,
+        }),
+      ])
 
       originalColumns.value = cols
       columns.value = cols.map((c) => ({
@@ -166,10 +201,22 @@
         originalName: c.name,
         originalType: c.data_type,
       }))
+
+      const editableIndexes: EditableIndex[] = idxs.map((idx) => ({
+        id: Math.random().toString(36).substring(2, 9),
+        name: idx.name,
+        columns: idx.columns,
+        isUnique: idx.is_unique,
+        isPrimary: idx.is_primary,
+        status: "existing" as const,
+        originalName: idx.name,
+      }))
+      originalIndexes.value = editableIndexes
+      indexes.value = editableIndexes.map((idx) => ({ ...idx }))
     } catch (e) {
       toast.add({
         severity: "error",
-        summary: "Failed to load columns",
+        summary: "Failed to load table structure",
         detail: String(e),
         life: 5000,
       })
@@ -236,6 +283,42 @@
     workspaceStore.setTabDirty(props.tabId, hasChanges.value)
   }
 
+  function addIndex() {
+    indexes.value.push({
+      id: Math.random().toString(36).substring(2, 9),
+      name: "",
+      columns: [],
+      isUnique: false,
+      isPrimary: false,
+      status: "added",
+    })
+    markDirty()
+  }
+
+  function removeIndex(idx: EditableIndex) {
+    if (idx.status === "added") {
+      indexes.value = indexes.value.filter((i) => i.id !== idx.id)
+    } else {
+      idx.status = "dropped"
+    }
+    markDirty()
+  }
+
+  function restoreIndex(idx: EditableIndex) {
+    if (idx.status === "dropped") {
+      const original = originalIndexes.value.find(
+        (i) => i.name === idx.originalName
+      )
+      if (original) {
+        idx.name = original.name
+        idx.columns = [...original.columns]
+        idx.isUnique = original.isUnique
+        idx.status = "existing"
+      }
+    }
+    markDirty()
+  }
+
   function generateAlterSql(): string {
     const lines: string[] = []
     const tableName =
@@ -280,6 +363,34 @@
             )
           }
           break
+      }
+    }
+
+    for (const idx of indexes.value) {
+      if (idx.status === "dropped" && idx.originalName) {
+        const quotedIndexName =
+          dbType.value === "mysql"
+            ? `\`${idx.originalName}\``
+            : `"${idx.originalName}"`
+        if (dbType.value === "mysql") {
+          lines.push(`DROP INDEX ${quotedIndexName} ON ${tableName};`)
+        } else {
+          lines.push(`DROP INDEX ${quotedIndexName};`)
+        }
+      } else if (
+        idx.status === "added" &&
+        idx.name.trim() &&
+        idx.columns.length > 0
+      ) {
+        const indexType = idx.isUnique ? "UNIQUE INDEX" : "INDEX"
+        const quotedIndexName =
+          dbType.value === "mysql" ? `\`${idx.name}\`` : `"${idx.name}"`
+        const quotedCols = idx.columns
+          .map((c) => (dbType.value === "mysql" ? `\`${c}\`` : `"${c}"`))
+          .join(", ")
+        lines.push(
+          `CREATE ${indexType} ${quotedIndexName} ON ${tableName} (${quotedCols});`
+        )
       }
     }
 
@@ -355,6 +466,7 @@
       originalName: c.name,
       originalType: c.data_type,
     }))
+    indexes.value = originalIndexes.value.map((idx) => ({ ...idx }))
     workspaceStore.setTabDirty(props.tabId, false)
   }
 
@@ -515,6 +627,121 @@
         </div>
       </div>
 
+      <div class="indexes-section">
+        <div class="section-header">
+          <h3>Indexes</h3>
+          <Button
+            icon="pi pi-plus"
+            label="Add Index"
+            size="small"
+            outlined
+            @click="addIndex"
+          />
+        </div>
+
+        <DataTable
+          v-if="indexes.filter((i) => i.status !== 'dropped').length > 0"
+          :value="indexes.filter((i) => i.status !== 'dropped')"
+          class="indexes-table"
+          size="small"
+          stripedRows
+          showGridlines
+        >
+          <Column header="Status" style="width: 100px">
+            <template #body="{ data }">
+              <Tag
+                :severity="
+                  data.status === 'added'
+                    ? 'success'
+                    : data.isPrimary
+                    ? 'info'
+                    : 'secondary'
+                "
+                :value="
+                  data.isPrimary
+                    ? 'Primary'
+                    : data.status === 'existing'
+                    ? 'Original'
+                    : data.status
+                "
+              />
+            </template>
+          </Column>
+          <Column header="Index Name" style="min-width: 150px">
+            <template #body="slotProps">
+              <InputText
+                v-model="slotProps.data.name"
+                class="w-full"
+                :disabled="slotProps.data.status === 'existing'"
+              />
+            </template>
+          </Column>
+          <Column header="Columns" style="min-width: 250px">
+            <template #body="slotProps">
+              <MultiSelect
+                v-model="slotProps.data.columns"
+                :options="availableColumnNames"
+                placeholder="Select columns"
+                class="w-full"
+                :disabled="slotProps.data.status === 'existing'"
+                @change="markDirty"
+              />
+            </template>
+          </Column>
+          <Column header="Unique" style="width: 80px">
+            <template #body="slotProps">
+              <Checkbox
+                v-model="slotProps.data.isUnique"
+                :binary="true"
+                :disabled="
+                  slotProps.data.status === 'existing' ||
+                  slotProps.data.isPrimary
+                "
+              />
+            </template>
+          </Column>
+          <Column header="" style="width: 60px">
+            <template #body="slotProps">
+              <Button
+                icon="pi pi-trash"
+                severity="danger"
+                text
+                rounded
+                size="small"
+                @click="removeIndex(slotProps.data)"
+                :disabled="slotProps.data.isPrimary"
+              />
+            </template>
+          </Column>
+        </DataTable>
+
+        <p v-else class="empty-hint">
+          <i class="pi pi-info-circle" />
+          No indexes defined. Click "Add Index" to create one.
+        </p>
+
+        <div
+          v-if="indexes.some((i) => i.status === 'dropped')"
+          class="dropped-indexes"
+        >
+          <h4>Dropped Indexes</h4>
+          <div
+            v-for="idx in indexes.filter((i) => i.status === 'dropped')"
+            :key="idx.id"
+            class="dropped-index"
+          >
+            <span>{{ idx.originalName }}</span>
+            <Button
+              icon="pi pi-undo"
+              label="Restore"
+              size="small"
+              text
+              @click="restoreIndex(idx)"
+            />
+          </div>
+        </div>
+      </div>
+
       <div class="sql-preview-section">
         <h3>SQL Preview</h3>
         <pre class="sql-preview">{{ sqlPreview }}</pre>
@@ -586,8 +813,53 @@
     font-weight: 600;
   }
 
-  .columns-table {
+  .columns-table,
+  .indexes-table {
     background: var(--p-surface-0);
+  }
+
+  .indexes-section {
+    border: 1px solid var(--p-surface-200);
+    border-radius: 8px;
+    padding: 1rem;
+    background: var(--p-surface-50);
+  }
+
+  .empty-hint {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin: 0;
+    padding: 1rem;
+    color: var(--p-text-muted-color);
+    font-size: 0.9rem;
+    background: var(--p-surface-0);
+    border-radius: 6px;
+    border: 1px dashed var(--p-surface-300);
+  }
+
+  .dropped-indexes {
+    margin-top: 1rem;
+    padding: 1rem;
+    background: var(--p-red-50);
+    border-radius: 6px;
+    border: 1px solid var(--p-red-200);
+  }
+
+  .dropped-indexes h4 {
+    margin: 0 0 0.5rem 0;
+    font-size: 0.85rem;
+    color: var(--p-red-700);
+  }
+
+  .dropped-index {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.5rem;
+    background: var(--p-surface-0);
+    border-radius: 4px;
+    margin-top: 0.5rem;
   }
 
   .dropped-columns {

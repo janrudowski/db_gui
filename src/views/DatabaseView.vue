@@ -32,7 +32,6 @@
     generateDelete,
     type DatabaseType as SqlDbType,
   } from "../utils/sql-generator"
-
   const props = defineProps<{ id: string }>()
   const router = useRouter()
   const connectionsStore = useConnectionsStore()
@@ -44,9 +43,9 @@
   const expandedKeys = ref<Record<string, boolean>>({})
   const loading = ref(false)
 
-  const contextMenu = ref<InstanceType<typeof ContextMenu> | null>(null)
-  const contextMenuItems = ref<MenuItem[]>([])
   const selectedContextNode = ref<TreeNode | null>(null)
+  const contextMenu = ref()
+  const contextMenuItems = ref<MenuItem[]>([])
 
   const showDropDialog = ref(false)
   const dropAction = ref<DropAction>("drop_table")
@@ -106,14 +105,18 @@
   }
 
   function onNodeContextMenu(event: MouseEvent, node: TreeNode) {
+    event.preventDefault()
+    event.stopPropagation()
     selectedContextNode.value = node
+    const nodeType = node.data?.type
 
-    if (node.data?.type === "schema") {
+    if (nodeType === "schema") {
+      const schemaName = node.data.name
       contextMenuItems.value = [
         {
           label: "New Table",
           icon: "pi pi-plus",
-          command: () => openTableCreatorTab(node.data.name),
+          command: () => openTableCreatorTab(schemaName),
         },
         {
           label: "Refresh",
@@ -124,11 +127,10 @@
         {
           label: dbType.value === "mysql" ? "Drop Database" : "Drop Schema",
           icon: "pi pi-trash",
-          class: "p-menuitem-danger",
-          command: () => openDropDialog("drop_schema", node.data.name),
+          command: () => openDropDialog("drop_schema", schemaName),
         },
       ]
-    } else if (node.data?.type === "table") {
+    } else if (nodeType === "table") {
       const schema = node.data.schema
       const table = node.data.name
       const sqlDbType = (dbType.value || "postgres") as SqlDbType
@@ -185,11 +187,10 @@
         {
           label: "Drop Table",
           icon: "pi pi-trash",
-          class: "p-menuitem-danger",
           command: () => openDropDialog("drop_table", schema, table),
         },
       ]
-    } else if (node.data?.type === "column") {
+    } else if (nodeType === "column") {
       const schema = node.data.schema
       const table = node.data.table
       const column = node.data.name
@@ -204,13 +205,14 @@
         {
           label: "Drop Column",
           icon: "pi pi-trash",
-          class: "p-menuitem-danger",
           command: () => confirmDropColumn(schema, table, column),
         },
       ]
     }
 
-    contextMenu.value?.show(event)
+    if (contextMenuItems.value.length > 0) {
+      contextMenu.value.show(event)
+    }
   }
 
   function openTableCreatorTab(schema: string) {
@@ -596,9 +598,16 @@
                 selectionMode="single"
                 @node-expand="onNodeExpand"
                 @node-select="onNodeSelect"
-                @node-contextmenu="(e: any) => onNodeContextMenu(e.originalEvent, e.node)"
                 class="schema-tree"
-              />
+              >
+                <template #default="{ node }">
+                  <span
+                    @contextmenu="(e: MouseEvent) => onNodeContextMenu(e, node)"
+                  >
+                    {{ node.label }}
+                  </span>
+                </template>
+              </Tree>
             </div>
           </TabPanel>
           <TabPanel value="history">

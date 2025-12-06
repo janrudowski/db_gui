@@ -1,8 +1,8 @@
 use crate::connection::{ConnectionStore, SavedConnection};
 use crate::db::{
     AlterTableParams, ColumnInfo, ConnectionFactory, DatabaseType, DbConnection, FetchDataParams,
-    FilterCondition, QueryResult, RowDelete, RowInsert, RowUpdate, SchemaInfo, SortColumn,
-    TableData, TableInfo,
+    FilterCondition, IndexInfo, QueryResult, RowDelete, RowInsert, RowUpdate, SchemaInfo,
+    SortColumn, TableData, TableInfo,
 };
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -187,6 +187,20 @@ pub async fn get_columns(
     let active = state.active_connections.read().await;
     let conn = active.get(&connection_id).ok_or("No active connection")?;
     conn.get_columns(&schema, &table)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn get_indexes(
+    state: State<'_, AppState>,
+    connection_id: String,
+    schema: String,
+    table: String,
+) -> Result<Vec<IndexInfo>, String> {
+    let active = state.active_connections.read().await;
+    let conn = active.get(&connection_id).ok_or("No active connection")?;
+    conn.get_indexes(&schema, &table)
         .await
         .map_err(|e| e.to_string())
 }

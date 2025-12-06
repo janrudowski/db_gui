@@ -7,19 +7,24 @@
 
   onMounted(() => {
     themeStore.loadTheme()
-  })
 
-  function preventContextMenu(event: MouseEvent) {
-    const target = event.target as HTMLElement
-    if (target.closest("[data-allow-context-menu]")) {
-      return
-    }
-    event.preventDefault()
-  }
+    document.addEventListener("contextmenu", (e) => {
+      const target = e.target as HTMLElement
+      if (
+        target.closest("input") ||
+        target.closest("textarea") ||
+        target.closest('[contenteditable="true"]') ||
+        target.closest(".monaco-editor")
+      ) {
+        return
+      }
+      e.preventDefault()
+    })
+  })
 </script>
 
 <template>
-  <div id="app-root" @contextmenu="preventContextMenu">
+  <div id="app-root">
     <ConfirmDialog />
     <router-view />
   </div>

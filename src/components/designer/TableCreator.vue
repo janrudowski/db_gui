@@ -9,6 +9,7 @@
   import Button from "primevue/button"
   import DataTable from "primevue/datatable"
   import Column from "primevue/column"
+  import MultiSelect from "primevue/multiselect"
   import type { DatabaseType } from "../../types"
   import { useWorkspaceStore } from "../../stores/workspace"
   import { useConnectionsStore } from "../../stores/connections"
@@ -20,6 +21,13 @@
     isPrimaryKey: boolean
     isNullable: boolean
     defaultValue: string
+  }
+
+  interface IndexDefinition {
+    id: string
+    name: string
+    columns: string[]
+    isUnique: boolean
   }
 
   const props = defineProps<{
@@ -39,6 +47,7 @@
   const loading = ref(false)
   const tableName = ref("")
   const columns = ref<ColumnDefinition[]>([createEmptyColumn()])
+  const indexes = ref<IndexDefinition[]>([])
 
   const connection = computed(() =>
     connectionsStore.connections.find((c) => c.id === props.connectionId)
@@ -143,6 +152,29 @@
     }
   }
 
+  function createEmptyIndex(): IndexDefinition {
+    return {
+      id: Math.random().toString(36).substring(2, 9),
+      name: "",
+      columns: [],
+      isUnique: false,
+    }
+  }
+
+  function addIndex() {
+    indexes.value.push(createEmptyIndex())
+    markDirty()
+  }
+
+  function removeIndex(id: string) {
+    indexes.value = indexes.value.filter((i) => i.id !== id)
+    markDirty()
+  }
+
+  const availableColumns = computed(() =>
+    columns.value.filter((c) => c.name.trim()).map((c) => c.name)
+  )
+
   function markDirty() {
     workspaceStore.setTabDirty(props.tabId, true)
   }
@@ -181,7 +213,25 @@
         return "  " + parts.join(" ")
       })
 
-    return `CREATE TABLE ${quotedTableName} (\n${columnDefs.join(",\n")}\n);`
+    let sql = `CREATE TABLE ${quotedTableName} (\n${columnDefs.join(",\n")}\n);`
+
+    const validIndexes = indexes.value.filter(
+      (idx) => idx.name.trim() && idx.columns.length > 0
+    )
+    if (validIndexes.length > 0) {
+      sql += "\n\n"
+      for (const idx of validIndexes) {
+        const indexType = idx.isUnique ? "UNIQUE INDEX" : "INDEX"
+        const quotedIndexName =
+          dbType.value === "mysql" ? `\`${idx.name}\`` : `"${idx.name}"`
+        const quotedCols = idx.columns
+          .map((c) => (dbType.value === "mysql" ? `\`${c}\`` : `"${c}"`))
+          .join(", ")
+        sql += `CREATE ${indexType} ${quotedIndexName} ON ${quotedTableName} (${quotedCols});\n`
+      }
+    }
+
+    return sql
   }
 
   const sqlPreview = computed(() => {
@@ -387,6 +437,76 @@
         </DataTable>
       </div>
 
+      <div class="indexes-section">
+        <div class="section-header">
+          <h3>Indexes</h3>
+          <Button
+            icon="pi pi-plus"
+            label="Add Index"
+            size="small"
+            outlined
+            @click="addIndex"
+          />
+        </div>
+
+        <DataTable
+          v-if="indexes.length > 0"
+          :value="indexes"
+          class="indexes-table"
+          size="small"
+          stripedRows
+          showGridlines
+        >
+          <Column header="Index Name" style="min-width: 150px">
+            <template #body="slotProps">
+              <InputText
+                v-model="slotProps.data.name"
+                placeholder="idx_name"
+                class="w-full"
+                @input="markDirty"
+              />
+            </template>
+          </Column>
+          <Column header="Columns" style="min-width: 250px">
+            <template #body="slotProps">
+              <MultiSelect
+                v-model="slotProps.data.columns"
+                :options="availableColumns"
+                placeholder="Select columns"
+                class="w-full"
+                @change="markDirty"
+              />
+            </template>
+          </Column>
+          <Column header="Unique" style="width: 80px">
+            <template #body="slotProps">
+              <Checkbox
+                v-model="slotProps.data.isUnique"
+                :binary="true"
+                @change="markDirty"
+              />
+            </template>
+          </Column>
+          <Column header="" style="width: 60px">
+            <template #body="slotProps">
+              <Button
+                icon="pi pi-trash"
+                severity="danger"
+                text
+                rounded
+                size="small"
+                @click="removeIndex(slotProps.data.id)"
+              />
+            </template>
+          </Column>
+        </DataTable>
+
+        <p v-else class="empty-hint">
+          <i class="pi pi-info-circle" />
+          No indexes defined. Click "Add Index" to create one.
+        </p>
+      </div>
+
       <div class="sql-preview-section">
         <h3>SQL Preview</h3>
         <pre class="sql-preview">{{ sqlPreview }}</pre>
@@ -475,7 +595,8 @@
     font-weight: 600;
   }
 
-  .columns-table {
+  .columns-table,
+  .indexes-table {
     background: var(--p-surface-0);
   }
 
@@ -483,6 +604,26 @@
     display: flex;
     flex-direction: column;
     gap: 0;
+  }
+
+  .indexes-section {
+    border: 1px solid var(--p-surface-200);
+    border-radius: 8px;
+    padding: 1rem;
+    background: var(--p-surface-50);
+  }
+
+  .empty-hint {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin: 0;
+    padding: 1rem;
+    color: var(--p-text-muted-color);
+    font-size: 0.9rem;
+    background: var(--p-surface-0);
+    border-radius: 6px;
+    border: 1px dashed var(--p-surface-300);
   }
 
   .sql-preview-section {

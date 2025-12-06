@@ -212,6 +212,36 @@ impl DbConnection for MySqlConnection {
             .collect())
     }
 
+    async fn get_indexes(&self, schema: &str, table: &str) -> DbResult<Vec<IndexInfo>> {
+        let query = format!("SHOW INDEX FROM `{}`.`{}`", schema, table);
+        let rows = sqlx::query(&query)
+            .fetch_all(&self.pool)
+            .await
+            .map_err(|e| DbError::Query(e.to_string()))?;
+
+        let mut index_map: std::collections::HashMap<String, IndexInfo> =
+            std::collections::HashMap::new();
+
+        for row in rows {
+            let index_name: String = row.get("Key_name");
+            let column_name: String = row.get("Column_name");
+            let non_unique: i32 = row.get("Non_unique");
+            let is_primary = index_name == "PRIMARY";
+
+            index_map
+                .entry(index_name.clone())
+                .and_modify(|idx| idx.columns.push(column_name.clone()))
+                .or_insert(IndexInfo {
+                    name: index_name,
+                    columns: vec![column_name],
+                    is_unique: non_unique == 0,
+                    is_primary,
+                });
+        }
+
+        Ok(index_map.into_values().collect())
+    }
+
     async fn get_table_data(&self, params: FetchDataParams) -> DbResult<TableData> {
         let columns = self.get_columns(&params.schema, &params.table).await?;
 

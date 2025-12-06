@@ -47,6 +47,13 @@ export interface ColumnInfo {
   default_value: string | null
 }
 
+export interface IndexInfo {
+  name: string
+  columns: string[]
+  is_unique: boolean
+  is_primary: boolean
+}
+
 export interface TableData {
   columns: ColumnInfo[]
   rows: unknown[][]
