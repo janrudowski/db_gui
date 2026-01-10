@@ -4,6 +4,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 
+
 pub struct AppState {
     pub connection_store: RwLock<ConnectionStore>,
     pub active_connections: RwLock<HashMap<String, Arc<dyn DbConnection>>>,
