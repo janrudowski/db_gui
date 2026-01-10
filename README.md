@@ -1,16 +1,94 @@
-# Tauri + Vue + TypeScript
+# DB GUI
 
-This template should help get you started developing with Vue 3 and TypeScript in Vite. The template uses Vue 3 `<script setup>` SFCs, check out the [script setup docs](https://v3.vuejs.org/api/sfc-script-setup.html#sfc-script-setup) to learn more.
+Lekkie, wieloplatformowe narzędzie do zarządzania relacyjnymi bazami danych, zbudowane z wykorzystaniem frameworka [Tauri](https://tauri.app/), języka [Rust](https://www.rust-lang.org/) oraz [Vue.js 3](https://vuejs.org/).
 
-## Recommended IDE Setup
+![Screenshot](docs/screenshot.png)
 
-- [VS Code](https://code.visualstudio.com/) + [Volar](https://marketplace.visualstudio.com/items?itemName=Vue.volar) + [Tauri](https://marketplace.visualstudio.com/items?itemName=tauri-apps.tauri-vscode) + [rust-analyzer](https://marketplace.visualstudio.com/items?itemName=rust-lang.rust-analyzer)
+## Funkcjonalności
 
-## Type Support For `.vue` Imports in TS
+- **Obsługa wielu silników bazodanowych**: PostgreSQL, MySQL, SQLite
+- **Edytor SQL**: Kolorowanie składni, autouzupełnianie (Monaco Editor)
+- **Interaktywna siatka danych**: Sortowanie, filtrowanie, edycja inline
+- **Zarządzanie transakcjami**: Tryb auto-commit oraz manualny (COMMIT/ROLLBACK)
+- **Bezpieczne przechowywanie haseł**: Szyfrowanie z użyciem Tauri Stronghold
+- **Eksport danych**: CSV, JSON
+- **Tryb ciemny/jasny**: Automatyczne wykrywanie preferencji systemowych
 
-Since TypeScript cannot handle type information for `.vue` imports, they are shimmed to be a generic Vue component type by default. In most cases this is fine if you don't really care about component prop types outside of templates. However, if you wish to get actual prop types in `.vue` imports (for example to get props validation when using manual `h(...)` calls), you can enable Volar's Take Over mode by following these steps:
+## Wymagania systemowe
 
-1. Run `Extensions: Show Built-in Extensions` from VS Code's command palette, look for `TypeScript and JavaScript Language Features`, then right click and select `Disable (Workspace)`. By default, Take Over mode will enable itself if the default TypeScript extension is disabled.
-2. Reload the VS Code window by running `Developer: Reload Window` from the command palette.
+| System | Wymagania |
+|--------|-----------|
+| Windows | Windows 10/11 (x64), WebView2 Runtime |
+| macOS | macOS 11+ (Intel/Apple Silicon) |
+| Linux | glibc 2.31+, WebKitGTK 4.1 |
 
-You can learn more about Take Over mode [here](https://github.com/johnsoncodehk/volar/discussions/471).
+## Instalacja
+
+### Gotowe pakiety
+
+Pobierz najnowszą wersję z sekcji [Releases](https://github.com/janrudowski/db-gui/releases):
+
+- **Windows**: `db-gui_x.x.x_x64-setup.exe`
+- **macOS**: `db-gui_x.x.x_aarch64.dmg` (Apple Silicon) lub `db-gui_x.x.x_x64.dmg` (Intel)
+- **Linux**: `db-gui_x.x.x_amd64.AppImage` lub `db-gui_x.x.x_amd64.deb`
+
+### Budowanie ze źródeł
+
+#### Wymagania
+
+- [Node.js](https://nodejs.org/) 18+
+- [pnpm](https://pnpm.io/)
+- [Rust](https://rustup.rs/) 1.70+
+
+#### Kroki
+
+```bash
+git clone https://github.com/janrudowski/db-gui.git
+cd db-gui
+
+pnpm install
+
+pnpm tauri dev
+
+pnpm tauri build
+```
+
+## Struktura projektu
+
+```
+db-gui/
+├── src/                    # Frontend (Vue.js + TypeScript)
+│   ├── components/         # Komponenty Vue
+│   ├── stores/             # Magazyny stanu Pinia
+│   └── views/              # Główne widoki
+├── src-tauri/              # Backend (Rust)
+│   └── src/
+│       ├── db/             # Abstrakcje baz danych
+│       └── commands.rs     # Komendy Tauri (IPC)
+└── tests/                  # Testy automatyczne
+```
+
+## Rozwój
+
+### Uruchomienie testów
+
+```bash
+pnpm test
+
+cd src-tauri && cargo test
+```
+
+### Konfiguracja IDE
+
+Zalecane rozszerzenia VS Code:
+- [rust-analyzer](https://marketplace.visualstudio.com/items?itemName=rust-lang.rust-analyzer)
+- [Volar](https://marketplace.visualstudio.com/items?itemName=Vue.volar)
+- [Tauri](https://marketplace.visualstudio.com/items?itemName=tauri-apps.tauri-vscode)
+
+## Licencja
+
+[MIT](LICENSE)
+
+## Autor
+
+Jan Rudowski - Praca inżynierska, Uniwersytet WSB Merito w Poznaniu, 2025
