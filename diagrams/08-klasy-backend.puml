@@ -1,0 +1,166 @@
+@startuml Diagram Klas - Backend (Rust)
+title Diagram Klas - Warstwa Backendu (Rust)
+
+skinparam classAttributeIconSize 0
+skinparam classFontStyle bold
+
+package "Stan Aplikacji" {
+    class AppState {
+        +connection_store: RwLock<ConnectionStore>
+        +active_connections: RwLock<HashMap<String, Arc<dyn DbConnection>>>
+        --
+        +default(): Self
+    }
+    
+    class ConnectionStore {
+        +connections: Vec<SavedConnection>
+        --
+        +load(): Self
+        +save(): Result<(), Error>
+        +add(conn: SavedConnection)
+        +remove(id: &str)
+        +get(id: &str): Option<&SavedConnection>
+    }
+    
+    class SavedConnection {
+        +id: String
+        +name: String
+        +db_type: DatabaseType
+        +host: String
+        +port: u16
+        +database: String
+        +username: String
+        +password_encrypted: Vec<u8>
+        --
+        +new(...): Self
+        +connection_string(): String
+    }
+}
+
+package "Połączenia z Bazą Danych" {
+    enum DatabaseType {
+        PostgreSQL
+        MySQL
+        SQLite
+    }
+    
+    interface DbConnection <<trait>> {
+        +test_connection(): Result<()>
+        +close(): Result<()>
+        +get_schemas(): Result<Vec<SchemaInfo>>
+        +get_tables(schema: &str): Result<Vec<TableInfo>>
+        +get_columns(schema: &str, table: &str): Result<Vec<ColumnInfo>>
+        +get_indexes(schema: &str, table: &str): Result<Vec<IndexInfo>>
+        +get_table_data(params: FetchDataParams): Result<TableData>
+        +execute_query(sql: &str): Result<QueryResult>
+        +update_row(update: RowUpdate): Result<u64>
+        +insert_row(insert: RowInsert): Result<Value>
+        +delete_row(delete: RowDelete): Result<u64>
+        +create_schema(name: &str): Result<()>
+        +drop_schema(name: &str, cascade: bool): Result<()>
+        +drop_table(schema: &str, table: &str, cascade: bool): Result<()>
+        +alter_table(params: AlterTableParams): Result<()>
+        +begin_transaction(): Result<()>
+        +commit(): Result<()>
+        +rollback(): Result<()>
+        +in_transaction(): bool
+    }
+    
+    class PostgresConnection {
+        -pool: PgPool
+        -in_tx: AtomicBool
+        --
+        +new(conn_str: &str): Result<Self>
+    }
+    
+    class MySqlConnection {
+        -pool: MySqlPool
+        -in_tx: AtomicBool
+        --
+        +new(conn_str: &str): Result<Self>
+    }
+    
+    class SqliteConnection {
+        -pool: SqlitePool
+        -in_tx: AtomicBool
+        --
+        +new(conn_str: &str): Result<Self>
+    }
+    
+    class ConnectionFactory {
+        --
+        +{static} create(db_type: DatabaseType, conn_str: &str): Result<Arc<dyn DbConnection>>
+        +{static} build_connection_string(...): String
+    }
+}
+
+package "Modele Danych" {
+    class SchemaInfo {
+        +name: String
+    }
+    
+    class TableInfo {
+        +schema: String
+        +name: String
+        +table_type: String
+    }
+    
+    class ColumnInfo {
+        +name: String
+        +data_type: String
+        +is_nullable: bool
+        +is_primary_key: bool
+        +default_value: Option<String>
+    }
+    
+    class IndexInfo {
+        +name: String
+        +columns: Vec<String>
+        +is_unique: bool
+        +is_primary: bool
+    }
+    
+    class QueryResult {
+        +columns: Vec<String>
+        +rows: Vec<Vec<Value>>
+        +rows_affected: u64
+        +execution_time_ms: u64
+    }
+    
+    class TableData {
+        +columns: Vec<ColumnInfo>
+        +rows: Vec<Vec<Value>>
+        +total_count: i64
+    }
+    
+    class FetchDataParams {
+        +schema: String
+        +table: String
+        +limit: i64
+        +offset: i64
+        +sort: Option<Vec<SortColumn>>
+        +filters: Option<Vec<FilterCondition>>
+    }
+}
+
+AppState "1" *-- "1" ConnectionStore
+ConnectionStore "1" *-- "*" SavedConnection
+SavedConnection --> DatabaseType
+
+AppState "1" o-- "*" DbConnection : active_connections
+
+DbConnection <|.. PostgresConnection
+DbConnection <|.. MySqlConnection
+DbConnection <|.. SqliteConnection
+
+ConnectionFactory ..> DbConnection : tworzy
+ConnectionFactory ..> DatabaseType : używa
+
+DbConnection ..> SchemaInfo : zwraca
+DbConnection ..> TableInfo : zwraca
+DbConnection ..> ColumnInfo : zwraca
+DbConnection ..> IndexInfo : zwraca
+DbConnection ..> QueryResult : zwraca
+DbConnection ..> TableData : zwraca
+
+@enduml

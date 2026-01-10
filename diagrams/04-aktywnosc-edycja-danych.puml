@@ -1,0 +1,90 @@
+@startuml Diagram Aktywności - Edycja Danych w Tabeli
+title Diagram Aktywności - Edycja Danych w Tabeli
+
+start
+
+:Użytkownik wybiera tabelę z drzewa schematów;
+
+:Otwarcie zakładki DataGrid;
+
+:Pobranie struktury tabeli (kolumny, typy, klucze);
+
+:Pobranie danych tabeli z paginacją;
+
+:Wyświetlenie danych w siatce;
+
+repeat
+    switch (Akcja użytkownika?)
+    case (Filtrowanie)
+        :Otwórz panel filtrów;
+        :Wybierz kolumnę i operator;
+        :Wprowadź wartość filtra;
+        :Zastosuj filtr;
+        :Przeładuj dane z filtrem;
+        
+    case (Sortowanie)
+        :Kliknij nagłówek kolumny;
+        :Zmień kierunek sortowania (ASC/DESC);
+        :Przeładuj dane z sortowaniem;
+        
+    case (Edycja komórki)
+        :Dwuklik na komórkę;
+        :Otwórz edytor inline;
+        :Wprowadź nową wartość;
+        
+        if (Auto-commit włączony?) then (tak)
+            :Zapisz zmianę natychmiast (UPDATE);
+        else (nie)
+            :Oznacz wiersz jako zmodyfikowany;
+            :Dodaj do kolejki zmian;
+        endif
+        
+        if (Zapis udany?) then (tak)
+            :Odśwież wiersz;
+            #palegreen:Wyświetl potwierdzenie;
+        else (nie)
+            #pink:Wyświetl błąd;
+            :Przywróć poprzednią wartość;
+        endif
+        
+    case (Dodanie wiersza)
+        :Kliknij "Dodaj wiersz";
+        :Wypełnij wartości kolumn;
+        :Wykonaj INSERT;
+        
+        if (Wstawienie udane?) then (tak)
+            :Dodaj wiersz do siatki;
+            #palegreen:Wyświetl potwierdzenie;
+        else (nie)
+            #pink:Wyświetl błąd walidacji;
+        endif
+        
+    case (Usunięcie wiersza)
+        :Zaznacz wiersz;
+        :Kliknij "Usuń";
+        :Potwierdź usunięcie;
+        
+        if (Usunięcie potwierdzone?) then (tak)
+            :Wykonaj DELETE;
+            :Usuń wiersz z siatki;
+        else (nie)
+            :Anuluj operację;
+        endif
+        
+    case (Eksport)
+        :Wybierz format (CSV/JSON);
+        :Wybierz lokalizację pliku;
+        :Eksportuj dane;
+        #palegreen:Wyświetl potwierdzenie eksportu;
+        
+    case (Paginacja)
+        :Kliknij następna/poprzednia strona;
+        :Załaduj nową porcję danych;
+        
+    endswitch
+    
+repeat while (Kontynuować edycję?) is (tak)
+
+stop
+
+@enduml

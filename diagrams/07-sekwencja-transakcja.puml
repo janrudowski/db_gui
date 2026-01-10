@@ -1,0 +1,121 @@
+@startuml Diagram Sekwencji - Zarządzanie Transakcjami
+title Diagram Sekwencji - Zarządzanie Transakcjami
+
+skinparam sequenceMessageAlign center
+
+actor "Użytkownik" as U
+participant "DatabaseView\n(Vue)" as DV
+participant "TransactionStore\n(Pinia)" as TS
+participant "invoke()\n(Tauri IPC)" as IPC
+participant "commands.rs\n(Rust)" as CMD
+participant "DbConnection\n(Trait)" as DB
+database "Baza Danych" as BDD
+
+== Wyłączenie Auto-Commit i Rozpoczęcie Transakcji ==
+
+U -> DV : Wyłącz przełącznik "Auto-commit"
+activate DV
+
+DV -> TS : toggleAutoCommit()
+activate TS
+TS -> TS : autoCommit = false
+TS --> DV : void
+deactivate TS
+
+DV -> TS : beginTransaction(connectionId)
+activate TS
+
+TS -> IPC : begin_transaction(connectionId)
+activate IPC
+
+IPC -> CMD : begin_transaction()
+activate CMD
+
+CMD -> DB : begin_transaction()
+activate DB
+
+DB -> BDD : BEGIN
+activate BDD
+BDD --> DB : OK
+deactivate BDD
+
+DB --> CMD : Ok(())
+deactivate DB
+
+CMD --> IPC : Ok(())
+deactivate CMD
+
+IPC --> TS : Ok
+deactivate IPC
+
+TS -> TS : inTransaction[connectionId] = true
+TS --> DV : void
+deactivate TS
+
+DV -> DV : Pokaż etykietę "IN TRANSACTION"
+DV --> U : Wyświetl stan transakcji
+deactivate DV
+
+== Wykonanie Operacji w Transakcji ==
+
+U -> DV : Edytuje dane w DataGrid
+activate DV
+DV -> IPC : update_row(...)
+IPC -> CMD : update_row()
+CMD -> DB : UPDATE ...
+DB -> BDD : UPDATE (w transakcji)
+BDD --> DB : OK
+DB --> CMD : Ok(1)
+CMD --> IPC : Ok
+IPC --> DV : Sukces
+DV --> U : Wiersz zaktualizowany
+deactivate DV
+
+== Zatwierdzenie Transakcji (COMMIT) ==
+
+U -> DV : Kliknij "Commit"
+activate DV
+
+DV -> TS : commit(connectionId)
+activate TS
+
+TS -> IPC : commit_transaction(connectionId)
+activate IPC
+
+IPC -> CMD : commit_transaction()
+activate CMD
+
+CMD -> DB : commit()
+activate DB
+
+DB -> BDD : COMMIT
+activate BDD
+BDD --> DB : OK
+deactivate BDD
+
+DB --> CMD : Ok(())
+deactivate DB
+
+CMD --> IPC : Ok(())
+deactivate CMD
+
+IPC --> TS : Ok
+deactivate IPC
+
+TS -> TS : inTransaction[connectionId] = false
+TS --> DV : void
+deactivate TS
+
+DV -> DV : Ukryj etykietę "IN TRANSACTION"
+DV --> U : Transakcja zatwierdzona
+deactivate DV
+
+== Alternatywa: Wycofanie Transakcji (ROLLBACK) ==
+
+note over U, BDD
+Jeśli użytkownik kliknie "Rollback" zamiast "Commit",
+wykonywana jest komenda ROLLBACK, która cofa wszystkie
+niezatwierdzone zmiany w bieżącej transakcji.
+end note
+
+@enduml

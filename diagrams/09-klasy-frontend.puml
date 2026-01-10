@@ -1,0 +1,185 @@
+@startuml Diagram Klas - Frontend (Vue.js/TypeScript)
+title Diagram Klas - Warstwa Prezentacji (Vue.js + TypeScript)
+
+skinparam classAttributeIconSize 0
+skinparam classFontStyle bold
+
+package "Store (Pinia)" {
+    class ConnectionsStore <<store>> {
+        +connections: ConnectionListItem[]
+        +activeConnectionId: string | null
+        +schemas: Map<string, SchemaInfo[]>
+        +tables: Map<string, TableInfo[]>
+        +columns: Map<string, ColumnInfo[]>
+        +loading: boolean
+        +error: string | null
+        --
+        +loadConnections(): Promise<void>
+        +saveConnection(input: ConnectionInput): Promise<string>
+        +deleteConnection(id: string): Promise<void>
+        +testConnection(input: TestConnectionInput): Promise<boolean>
+        +connect(id: string): Promise<void>
+        +disconnect(id: string): Promise<void>
+        +loadSchemas(connectionId: string): Promise<void>
+        +loadTables(connectionId: string, schema: string): Promise<void>
+        +getColumns(connectionId: string, schema: string, table: string): Promise<ColumnInfo[]>
+    }
+    
+    class WorkspaceStore <<store>> {
+        +panes: Pane[]
+        +activePaneId: string
+        +splitDirection: "horizontal" | "vertical" | null
+        --
+        +openTab(connectionId: string, type: TabType, title: string, options?: OpenTabOptions): string
+        +closeTab(paneId: string, tabId: string): void
+        +closeActiveTab(): void
+        +nextTab(): void
+        +previousTab(): void
+        +splitPane(targetPaneId: string, position: string, tab?: Tab): void
+        +closePane(paneId: string): void
+        +moveTab(fromPaneId: string, toPaneId: string, tabId: string, toIndex: number): void
+        +setTabDirty(tabId: string, isDirty: boolean): void
+        +updateTabQuery(tabId: string, query: string): void
+    }
+    
+    class HistoryStore <<store>> {
+        +entries: HistoryEntry[]
+        +recentEntries: HistoryEntry[]
+        +successCount: number
+        +errorCount: number
+        --
+        +addEntry(sql: string, connectionId: string, status: string, duration: number, ...): void
+        +clearHistory(): void
+        +removeEntry(id: string): void
+        +getEntriesForConnection(connectionId: string): HistoryEntry[]
+    }
+    
+    class TransactionStore <<store>> {
+        +autoCommit: boolean
+        +inTransaction: Record<string, boolean>
+        +loading: boolean
+        --
+        +isInTransaction(connectionId: string): boolean
+        +beginTransaction(connectionId: string): Promise<void>
+        +commit(connectionId: string): Promise<void>
+        +rollback(connectionId: string): Promise<void>
+        +toggleAutoCommit(): void
+    }
+    
+    class ThemeStore <<store>> {
+        +isDark: boolean
+        --
+        +loadTheme(): void
+        +toggleTheme(): void
+    }
+}
+
+package "Typy Danych" {
+    enum DatabaseType {
+        postgresql
+        mysql
+        sqlite
+    }
+    
+    enum TabType {
+        data-grid
+        sql-editor
+        table-creator
+        table-designer
+        schema-creator
+    }
+    
+    class ConnectionListItem {
+        +id: string
+        +name: string
+        +db_type: DatabaseType
+        +host: string
+        +port: number
+        +database: string
+        +username: string
+    }
+    
+    class Tab {
+        +id: string
+        +type: TabType
+        +title: string
+        +connectionId: string
+        +schema?: string
+        +table?: string
+        +query?: string
+        +isDirty?: boolean
+        +metadata?: Record<string, unknown>
+    }
+    
+    class Pane {
+        +id: string
+        +tabs: Tab[]
+        +activeTabId: string | null
+    }
+    
+    class HistoryEntry {
+        +id: string
+        +sql: string
+        +connectionId: string
+        +timestamp: number
+        +status: "success" | "error"
+        +duration: number
+        +rowsAffected?: number
+        +error?: string
+    }
+    
+    class QueryResult {
+        +columns: string[]
+        +rows: unknown[][]
+        +rows_affected: number
+        +execution_time_ms: number
+    }
+    
+    class ColumnInfo {
+        +name: string
+        +data_type: string
+        +is_nullable: boolean
+        +is_primary_key: boolean
+        +default_value: string | null
+    }
+}
+
+package "Widoki" {
+    class ConnectionsView <<component>> {
+        -showNewDialog: boolean
+        -loading: boolean
+        -searchQuery: string
+        -newConnection: ConnectionInput
+        --
+        +handleSaveConnection(): Promise<void>
+        +testConnection(): Promise<void>
+        +handleDeleteConnection(id: string): Promise<void>
+        +connectToDatabase(conn: ConnectionListItem): Promise<void>
+    }
+    
+    class DatabaseView <<component>> {
+        -treeNodes: TreeNode[]
+        -expandedKeys: Record<string, boolean>
+        -loading: boolean
+        --
+        +loadSchemas(): Promise<void>
+        +onNodeExpand(node: TreeNode): Promise<void>
+        +onNodeSelect(node: TreeNode): void
+        +openNewQuery(): void
+        +disconnect(): Promise<void>
+    }
+}
+
+ConnectionsStore --> ConnectionListItem : zarządza
+WorkspaceStore --> Pane : zarządza
+WorkspaceStore --> Tab : zarządza
+HistoryStore --> HistoryEntry : zarządza
+ConnectionListItem --> DatabaseType
+Tab --> TabType
+
+ConnectionsView ..> ConnectionsStore : używa
+DatabaseView ..> ConnectionsStore : używa
+DatabaseView ..> WorkspaceStore : używa
+DatabaseView ..> TransactionStore : używa
+
+@enduml

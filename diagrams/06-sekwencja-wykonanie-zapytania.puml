@@ -1,0 +1,87 @@
+@startuml Diagram Sekwencji - Wykonanie Zapytania SQL
+title Diagram Sekwencji - Wykonanie Zapytania SQL
+
+skinparam sequenceMessageAlign center
+skinparam responseMessageBelowArrow true
+
+actor "Użytkownik" as U
+participant "SqlEditor\n(Vue)" as SE
+participant "HistoryStore\n(Pinia)" as HS
+participant "invoke()\n(Tauri IPC)" as IPC
+participant "commands.rs\n(Rust)" as CMD
+participant "AppState\n(Rust)" as AS
+participant "DbConnection\n(Trait)" as DB
+database "Baza Danych" as BDD
+
+U -> SE : Wpisuje zapytanie SQL
+activate SE
+
+U -> SE : Naciska Ctrl+Enter
+SE -> SE : Walidacja zapytania
+
+SE -> SE : Rozpocznij pomiar czasu
+SE -> SE : Pokaż wskaźnik ładowania
+
+SE -> IPC : execute_query(connectionId, sql)
+activate IPC
+
+IPC -> CMD : execute_query()
+activate CMD
+
+CMD -> AS : get active_connections
+activate AS
+AS --> CMD : HashMap<String, DbConnection>
+deactivate AS
+
+CMD -> DB : execute_query(&sql)
+activate DB
+
+DB -> BDD : SELECT/INSERT/UPDATE/DELETE
+activate BDD
+
+alt Zapytanie udane
+    BDD --> DB : Wyniki (wiersze)
+    DB --> CMD : QueryResult { columns, rows, execution_time }
+    deactivate DB
+    
+    CMD --> IPC : Ok(QueryResult)
+    deactivate CMD
+    
+    IPC --> SE : QueryResult
+    deactivate IPC
+    
+    SE -> SE : Oblicz czas wykonania
+    SE -> SE : Ukryj wskaźnik ładowania
+    
+    SE -> HS : addEntry(sql, "success", duration, rowsAffected)
+    activate HS
+    HS -> HS : Zapisz w localStorage
+    HS --> SE : void
+    deactivate HS
+    
+    SE -> SE : Wyświetl wyniki w DataGrid
+    SE --> U : Pokaż wyniki
+    
+else Błąd zapytania
+    BDD --> DB : Błąd SQL
+    deactivate BDD
+    DB --> CMD : Error(message)
+    deactivate DB
+    
+    CMD --> IPC : Err(error_message)
+    deactivate CMD
+    
+    IPC --> SE : Error
+    deactivate IPC
+    
+    SE -> HS : addEntry(sql, "error", duration, error)
+    activate HS
+    HS --> SE : void
+    deactivate HS
+    
+    SE --> U : Wyświetl komunikat błędu
+end
+
+deactivate SE
+
+@enduml

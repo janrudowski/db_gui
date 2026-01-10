@@ -1,0 +1,114 @@
+@startuml Diagram Stanów Aplikacji
+title Diagram Stanów - Cykl Życia Aplikacji DB GUI
+
+skinparam state {
+    BackgroundColor<<active>> LightGreen
+    BackgroundColor<<error>> LightCoral
+    BackgroundColor<<loading>> LightYellow
+}
+
+[*] --> Uruchamianie
+
+state Uruchamianie {
+    [*] --> LadowanieMotywu
+    LadowanieMotywu : Odczyt preferencji z localStorage
+    LadowanieMotywu --> LadowaniePolaczen
+    LadowaniePolaczen : Odczyt zapisanych połączeń
+    LadowaniePolaczen --> GotowyDoStartu
+}
+
+Uruchamianie --> EkranPolaczen : Inicjalizacja zakończona
+
+state EkranPolaczen {
+    [*] --> ListaPolaczen
+    
+    ListaPolaczen : Wyświetla zapisane połączenia
+    ListaPolaczen --> TworzeniePolaczenia : "Nowe Połączenie"
+    ListaPolaczen --> Laczenie : Wybór połączenia
+    
+    state TworzeniePolaczenia {
+        [*] --> WypelnianieFrmularza
+        WypelnianieFormularza --> TestowaniePolaczenia : "Testuj"
+        TestowaniePolaczenia --> WypelnianieFormularza : Błąd
+        TestowaniePolaczenia --> WypelnianieFormularza : Sukces
+        WypelnianieFormularza --> ZapisywanePolaczenie : "Zapisz"
+        ZapisywanePolaczenie --> [*]
+    }
+    
+    TworzeniePolaczenia --> ListaPolaczen : Anuluj
+    TworzeniePolaczenia --> ListaPolaczen : Zapisano
+    
+    state Laczenie <<loading>> {
+        [*] --> NawiazywaniePol
+        NawiazywaniePol : Tworzenie połączenia DB
+        NawiazywaniePol --> LadowanieSch : Sukces
+        LadowanieSch : Pobieranie schematów
+        LadowanieSch --> [*]
+    }
+    
+    Laczenie --> ListaPolaczen : Błąd połączenia
+}
+
+EkranPolaczen --> WidokBazyDanych : Połączono
+
+state WidokBazyDanych <<active>> {
+    [*] --> Bezczynny
+    
+    state Bezczynny {
+        [*] --> PrzegladanieSchematu
+    }
+    
+    state "Praca z Danymi" as PracaZDanymi {
+        state DataGrid {
+            [*] --> WyswietlanieDanych
+            WyswietlanieDanych --> Filtrowanie : Zastosuj filtr
+            WyswietlanieDanych --> Sortowanie : Kliknij kolumnę
+            WyswietlanieDanych --> EdycjaKomorki : Dwuklik
+            Filtrowanie --> WyswietlanieDanych
+            Sortowanie --> WyswietlanieDanych
+            EdycjaKomorki --> WyswietlanieDanych : Zapisz/Anuluj
+        }
+        
+        state EdytorSQL {
+            [*] --> PisanieZapytania
+            PisanieZapytania --> WykonywnieZapytania : Ctrl+Enter
+            WykonywnieZapytania --> WyswietlanieWynikow : Sukces
+            WykonywnieZapytania --> WyswietlanieBledu : Błąd
+            WyswietlanieWynikow --> PisanieZapytania
+            WyswietlanieBledu --> PisanieZapytania
+        }
+    }
+    
+    state Transakcja {
+        [*] --> AutoCommit
+        AutoCommit --> WTransakcji : Wyłącz auto-commit
+        WTransakcji : BEGIN wykonane
+        WTransakcji --> AutoCommit : COMMIT
+        WTransakcji --> AutoCommit : ROLLBACK
+    }
+    
+    Bezczynny --> PracaZDanymi : Otwórz tabelę/zapytanie
+    PracaZDanymi --> Bezczynny : Zamknij zakładkę
+    
+    state "Projektowanie Struktury" as Projektowanie {
+        state TworzenieTabeli
+        state ModyfikacjaTabeli
+        state TworzenieSchematu
+    }
+    
+    Bezczynny --> Projektowanie : Nowa tabela/schemat
+    Projektowanie --> Bezczynny : Zapisz/Anuluj
+}
+
+WidokBazyDanych --> EkranPolaczen : Rozłącz
+
+state BladAplikacji <<error>> {
+    [*] --> WyswietlenieBledu
+    WyswietlenieBledu --> [*]
+}
+
+EkranPolaczen --> BladAplikacji : Krytyczny błąd
+WidokBazyDanych --> BladAplikacji : Krytyczny błąd
+BladAplikacji --> EkranPolaczen : Powrót
+
+@enduml

@@ -1,0 +1,61 @@
+@startuml Diagram Aktywności - Połączenie z Bazą Danych
+title Diagram Aktywności - Nawiązywanie Połączenia z Bazą Danych
+
+start
+
+:Użytkownik otwiera aplikację;
+
+:Wyświetlenie listy zapisanych połączeń;
+
+if (Czy istnieją zapisane połączenia?) then (tak)
+    :Wybierz połączenie z listy;
+else (nie)
+    :Kliknij "Nowe Połączenie";
+    
+    repeat
+        :Wypełnij formularz połączenia;
+        note right
+            - Nazwa połączenia
+            - Typ bazy danych (PostgreSQL/MySQL/SQLite)
+            - Host i port
+            - Nazwa bazy danych
+            - Nazwa użytkownika
+            - Hasło
+        end note
+        
+        if (Czy testować połączenie?) then (tak)
+            :Kliknij "Testuj";
+            
+            :Wysłanie żądania testowego do backendu;
+            :Próba nawiązania połączenia z bazą;
+            
+            if (Połączenie udane?) then (tak)
+                :Wyświetl komunikat sukcesu;
+            else (nie)
+                :Wyświetl komunikat błędu;
+            endif
+        else (nie)
+        endif
+        
+    repeat while (Formularz poprawny?) is (nie) not (tak)
+    
+    :Kliknij "Zapisz";
+    :Zapisanie połączenia w Stronghold;
+endif
+
+:Kliknij "Połącz";
+
+:Utworzenie połączenia w backendzie;
+
+if (Połączenie udane?) then (tak)
+    :Załadowanie schematów bazy danych;
+    :Przejście do widoku bazy danych (DatabaseView);
+    :Wyświetlenie drzewa schematów i tabel;
+else (nie)
+    :Wyświetl komunikat błędu;
+    :Powrót do listy połączeń;
+endif
+
+stop
+
+@enduml

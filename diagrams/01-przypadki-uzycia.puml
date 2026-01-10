@@ -1,0 +1,115 @@
+@startuml Diagram Przypadków Użycia
+skinparam actorStyle awesome
+skinparam packageStyle rectangle
+left to right direction
+
+title Diagram Przypadków Użycia - DB GUI
+
+actor "Użytkownik" as user
+
+rectangle "Aplikacja DB GUI" {
+    package "Zarządzanie Połączeniami" {
+        usecase "Dodaj nowe połączenie" as UC1
+        usecase "Testuj połączenie" as UC2
+        usecase "Edytuj połączenie" as UC3
+        usecase "Usuń połączenie" as UC4
+        usecase "Połącz z bazą danych" as UC5
+        usecase "Rozłącz z bazą danych" as UC6
+    }
+    
+    package "Przeglądanie Struktury Bazy" {
+        usecase "Przeglądaj schematy" as UC7
+        usecase "Przeglądaj tabele" as UC8
+        usecase "Przeglądaj kolumny" as UC9
+        usecase "Przeglądaj indeksy" as UC10
+    }
+    
+    package "Operacje na Danych" {
+        usecase "Wyświetl dane tabeli" as UC11
+        usecase "Filtruj dane" as UC12
+        usecase "Sortuj dane" as UC13
+        usecase "Edytuj wiersz" as UC14
+        usecase "Dodaj wiersz" as UC15
+        usecase "Usuń wiersz" as UC16
+    }
+    
+    package "Edytor SQL" {
+        usecase "Napisz zapytanie SQL" as UC17
+        usecase "Wykonaj zapytanie" as UC18
+        usecase "Przeglądaj historię zapytań" as UC19
+        usecase "Generuj SQL" as UC20
+    }
+    
+    package "Zarządzanie Strukturą" {
+        usecase "Utwórz schemat" as UC21
+        usecase "Usuń schemat" as UC22
+        usecase "Utwórz tabelę" as UC23
+        usecase "Modyfikuj tabelę" as UC24
+        usecase "Usuń tabelę" as UC25
+        usecase "Wyczyść tabelę (TRUNCATE)" as UC26
+    }
+    
+    package "Transakcje" {
+        usecase "Rozpocznij transakcję" as UC27
+        usecase "Zatwierdź (COMMIT)" as UC28
+        usecase "Wycofaj (ROLLBACK)" as UC29
+        usecase "Przełącz auto-commit" as UC30
+    }
+    
+    package "Eksport Danych" {
+        usecase "Eksportuj do CSV" as UC31
+        usecase "Eksportuj do JSON" as UC32
+    }
+    
+    package "Interfejs Użytkownika" {
+        usecase "Przełącz motyw (jasny/ciemny)" as UC33
+        usecase "Podziel panel" as UC34
+        usecase "Zarządzaj zakładkami" as UC35
+    }
+}
+
+user --> UC1
+user --> UC2
+user --> UC3
+user --> UC4
+user --> UC5
+user --> UC6
+user --> UC7
+user --> UC8
+user --> UC9
+user --> UC10
+user --> UC11
+user --> UC12
+user --> UC13
+user --> UC14
+user --> UC15
+user --> UC16
+user --> UC17
+user --> UC18
+user --> UC19
+user --> UC20
+user --> UC21
+user --> UC22
+user --> UC23
+user --> UC24
+user --> UC25
+user --> UC26
+user --> UC27
+user --> UC28
+user --> UC29
+user --> UC30
+user --> UC31
+user --> UC32
+user --> UC33
+user --> UC34
+user --> UC35
+
+UC2 ..> UC1 : <<include>>
+UC5 ..> UC1 : <<include>>
+UC12 ..> UC11 : <<extend>>
+UC13 ..> UC11 : <<extend>>
+UC18 ..> UC17 : <<include>>
+UC28 ..> UC27 : <<include>>
+UC29 ..> UC27 : <<include>>
+
+@enduml

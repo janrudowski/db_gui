@@ -1,0 +1,83 @@
+@startuml Diagram Wdrożenia
+title Diagram Wdrożenia - Architektura Aplikacji DB GUI
+
+skinparam nodeStyle rectangle
+
+node "Komputer Użytkownika" as PC {
+    node "Aplikacja Tauri" as TAURI {
+        artifact "Frontend\n(WebView)" as FE {
+            component "Vue.js App" as VUE
+            component "Pinia Store" as STORE
+            component "Monaco Editor" as MONACO
+            component "PrimeVue UI" as PRIME
+        }
+        
+        artifact "Backend\n(Rust)" as BE {
+            component "Tauri Runtime" as RT
+            component "Komendy IPC" as IPC
+            component "Moduł PostgreSQL\n(sqlx)" as PGMOD
+            component "Moduł MySQL\n(sqlx)" as MYMOD  
+            component "Moduł SQLite\n(sqlx)" as SLMOD
+        }
+        
+        database "Stronghold\n(szyfrowane dane)" as SH {
+            artifact "Dane połączeń"
+            artifact "Hasła"
+        }
+        
+        database "localStorage" as LS {
+            artifact "Historia zapytań"
+            artifact "Preferencje UI"
+        }
+    }
+}
+
+cloud "Sieć Lokalna / Internet" as NET
+
+node "Serwer PostgreSQL" as PGSRV {
+    database "PostgreSQL DB" as PGDB
+}
+
+node "Serwer MySQL" as MYSRV {
+    database "MySQL DB" as MYDB
+}
+
+node "System Plików" as FS {
+    database "SQLite File\n(.db/.sqlite)" as SLDB
+}
+
+VUE --> STORE : stan aplikacji
+VUE --> MONACO : edycja SQL
+VUE --> PRIME : komponenty UI
+
+VUE <..> IPC : Tauri invoke()
+IPC --> RT : obsługa komend
+RT --> PGMOD
+RT --> MYMOD
+RT --> SLMOD
+RT --> SH : odczyt/zapis
+VUE --> LS : persystencja
+
+PGMOD ..> NET
+MYMOD ..> NET
+NET ..> PGSRV
+NET ..> MYSRV
+
+SLMOD --> FS
+
+note right of TAURI
+    **Technologie:**
+    - Tauri 2.x (framework)
+    - Rust (backend)
+    - Vue 3 + TypeScript (frontend)
+    - Vite (bundler)
+    - sqlx (async SQL)
+end note
+
+note bottom of SH
+    Stronghold zapewnia
+    bezpieczne przechowywanie
+    wrażliwych danych (hasła)
+end note
+
+@enduml

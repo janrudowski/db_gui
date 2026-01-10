@@ -1,0 +1,125 @@
+@startuml Diagram Komponentów
+title Diagram Komponentów - Architektura Aplikacji DB GUI
+
+skinparam componentStyle uml2
+skinparam packageStyle rectangle
+
+package "Warstwa Prezentacji (Vue.js + TypeScript)" {
+    package "Widoki" {
+        [ConnectionsView] as CV
+        [DatabaseView] as DV
+    }
+    
+    package "Komponenty" {
+        package "Layout" {
+            [WorkspacePane] as WP
+            [HistoryPanel] as HP
+        }
+        
+        package "Dane" {
+            [DataGrid] as DG
+            [ColumnFilter] as CF
+            [ValueInspector] as VI
+        }
+        
+        package "Edytor" {
+            [SqlEditor] as SE
+        }
+        
+        package "Designer" {
+            [TableCreator] as TC
+            [TableDesigner] as TD
+            [SchemaCreator] as SC
+        }
+        
+        package "Eksport" {
+            [ExportDialog] as ED
+        }
+        
+        package "Wspólne" {
+            [ThemeToggle] as TT
+            [DropConfirmDialog] as DCD
+        }
+    }
+    
+    package "Store (Pinia)" {
+        [ConnectionsStore] as CS
+        [WorkspaceStore] as WS
+        [HistoryStore] as HS
+        [TransactionStore] as TS
+        [ThemeStore] as THS
+    }
+    
+    package "Serwisy" {
+        [ContextMenuService] as CMS
+        [DockingService] as DS
+    }
+    
+    package "Narzędzia" {
+        [SqlGenerator] as SG
+        [MonacoConfig] as MC
+    }
+}
+
+package "Most Tauri (IPC)" {
+    [invoke()] as INV
+}
+
+package "Warstwa Backendu (Rust)" {
+    package "Komendy Tauri" {
+        [commands.rs] as CMD
+    }
+    
+    package "Stan Aplikacji" {
+        [AppState] as AS
+        [ConnectionStore] as CST
+    }
+    
+    package "Baza Danych" {
+        interface "DbConnection (Trait)" as DBC
+        
+        [PostgresConnection] as PG
+        [MySqlConnection] as MY
+        [SqliteConnection] as SL
+        [ConnectionFactory] as FAC
+    }
+}
+
+database "PostgreSQL" as PGDB
+database "MySQL" as MYDB
+database "SQLite" as SLDB
+
+CV --> CS : używa
+DV --> CS : używa
+DV --> WS : używa
+DV --> TS : używa
+
+WP --> DG : zawiera
+WP --> SE : zawiera
+WP --> TC : zawiera
+WP --> TD : zawiera
+
+DG --> CF : używa
+DG --> VI : używa
+SE --> MC : konfiguruje
+
+CS --> INV : wywołuje
+TS --> INV : wywołuje
+
+INV --> CMD : IPC
+
+CMD --> AS : odczyt/zapis
+CMD --> DBC : operacje DB
+
+AS --> CST : przechowuje
+
+FAC ..|> DBC : tworzy
+PG ..|> DBC : implementuje
+MY ..|> DBC : implementuje
+SL ..|> DBC : implementuje
+
+PG --> PGDB : łączy
+MY --> MYDB : łączy
+SL --> SLDB : łączy
+
+@enduml

@@ -1,0 +1,56 @@
+@startuml Diagram Aktywności - Wykonanie Zapytania SQL
+title Diagram Aktywności - Wykonanie Zapytania SQL
+
+start
+
+:Użytkownik otwiera nową zakładkę SQL;
+
+:Wyświetlenie edytora Monaco;
+
+repeat
+    :Wpisz/edytuj zapytanie SQL;
+    
+    if (Czy użyć generatora SQL?) then (tak)
+        :Kliknij prawym na tabelę;
+        :Wybierz typ zapytania (SELECT/INSERT/UPDATE/DELETE);
+        :Wstaw wygenerowany SQL do edytora;
+    else (nie)
+    endif
+    
+    :Naciśnij Ctrl+Enter lub kliknij "Wykonaj";
+    
+    :Rozpocznij pomiar czasu wykonania;
+    
+    fork
+        :Wysłanie zapytania do backendu (Rust);
+    fork again
+        :Wyświetlenie wskaźnika ładowania;
+    end fork
+    
+    :Backend wykonuje zapytanie na bazie danych;
+    
+    if (Zapytanie wykonane pomyślnie?) then (tak)
+        :Oblicz czas wykonania;
+        :Zwróć wyniki (kolumny + wiersze);
+        
+        if (Zapytanie zwraca dane?) then (tak)
+            :Wyświetl wyniki w DataGrid;
+            :Umożliw sortowanie i filtrowanie;
+            :Umożliw eksport danych;
+        else (nie)
+            :Wyświetl liczbę zmienionych wierszy;
+        endif
+        
+        :Zapisz wpis w historii (status: sukces);
+        #palegreen:Wyświetl komunikat sukcesu;
+    else (nie)
+        :Zapisz wpis w historii (status: błąd);
+        #pink:Wyświetl komunikat błędu;
+        :Użytkownik analizuje błąd;
+    endif
+    
+repeat while (Kontynuować pracę?) is (tak)
+
+stop
+
+@enduml
