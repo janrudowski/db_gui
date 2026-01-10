@@ -39,23 +39,21 @@
   const isDragging = ref(false)
 
   watch(
-    () => props.tabs,
-    (newTabs, oldTabs) => {
-      console.log("[TabBar] WATCH props.tabs changed", {
-        paneId: props.paneId,
-        isDragging: isDragging.value,
-        oldCount: oldTabs?.length,
-        newCount: newTabs.length,
-        newTabIds: newTabs.map((t) => t.id),
-      })
+    () => props.tabs.map((t) => t.id).join(","),
+    () => {
       if (!isDragging.value) {
-        console.log("[TabBar] WATCH: Syncing localTabs from props")
-        localTabs.value = [...newTabs]
-      } else {
-        console.log("[TabBar] WATCH: SKIPPING sync because isDragging=true")
+        localTabs.value = [...props.tabs]
       }
-    },
-    { deep: true }
+    }
+  )
+
+  watch(
+    () => props.tabs.map((t) => `${t.id}:${t.title}:${t.isDirty}`).join(","),
+    () => {
+      if (!isDragging.value) {
+        localTabs.value = [...props.tabs]
+      }
+    }
   )
 
   function clearDockingState() {

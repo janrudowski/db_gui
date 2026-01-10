@@ -270,6 +270,9 @@ impl DbConnection for SqliteConnection {
         let is_select = sql_lower.starts_with("select") || sql_lower.starts_with("with");
 
         if is_select {
+            use sqlx::Executor;
+            let describe = self.pool.describe(sql).await.ok();
+
             let rows = sqlx::query(sql)
                 .fetch_all(&self.pool)
                 .await
@@ -277,20 +280,20 @@ impl DbConnection for SqliteConnection {
 
             let execution_time_ms = start.elapsed().as_millis();
 
-            if rows.is_empty() {
-                return Ok(QueryResult {
-                    columns: vec![],
-                    rows: vec![],
-                    rows_affected: 0,
-                    execution_time_ms,
-                });
-            }
-
-            let columns: Vec<String> = rows[0]
-                .columns()
-                .iter()
-                .map(|c| c.name().to_string())
-                .collect();
+            let columns: Vec<String> = if !rows.is_empty() {
+                rows[0]
+                    .columns()
+                    .iter()
+                    .map(|c| c.name().to_string())
+                    .collect()
+            } else if let Some(desc) = describe {
+                desc.columns()
+                    .iter()
+                    .map(|c| c.name().to_string())
+                    .collect()
+            } else {
+                vec![]
+            };
 
             let mut result_rows: Vec<Vec<serde_json::Value>> = Vec::new();
             for row in &rows {

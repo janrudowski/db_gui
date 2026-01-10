@@ -403,7 +403,6 @@
         v-for="col in columns"
         :key="col.name"
         :field="col.name"
-        :header="col.name"
         :sortable="sortable"
         style="min-width: 120px"
       >

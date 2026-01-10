@@ -55,11 +55,23 @@ export const useConnectionsStore = defineStore("connections", () => {
     return await invoke<boolean>("test_connection", { input })
   }
 
+  const CONNECTION_TIMEOUT_MS = 15000
+
   async function connect(id: string) {
     loading.value = true
     error.value = null
     try {
-      await invoke("connect_to_database", { id })
+      const connectPromise = invoke("connect_to_database", { id })
+      const timeoutPromise = new Promise((_, reject) =>
+        setTimeout(
+          () =>
+            reject(
+              new Error("Connection timed out. Database may be unavailable.")
+            ),
+          CONNECTION_TIMEOUT_MS
+        )
+      )
+      await Promise.race([connectPromise, timeoutPromise])
       activeConnectionId.value = id
       await loadSchemas(id)
     } catch (e) {

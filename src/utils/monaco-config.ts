@@ -13,6 +13,29 @@ interface TableReference {
   alias?: string
 }
 
+const SQL_KEYWORDS = new Set([
+  "where",
+  "join",
+  "inner",
+  "left",
+  "right",
+  "outer",
+  "cross",
+  "on",
+  "and",
+  "or",
+  "order",
+  "group",
+  "having",
+  "limit",
+  "offset",
+  "union",
+  "select",
+  "from",
+  "set",
+  "values",
+])
+
 function extractTableReferences(sql: string): TableReference[] {
   const refs: TableReference[] = []
   const normalizedSql = sql.replace(/\s+/g, " ").toLowerCase()
@@ -29,11 +52,14 @@ function extractTableReferences(sql: string): TableReference[] {
       const tablePart = parts[0]
       const alias = parts[1]
 
+      const validAlias =
+        alias && !SQL_KEYWORDS.has(alias.toLowerCase()) ? alias : undefined
+
       if (tablePart.includes(".")) {
         const [schema, table] = tablePart.split(".")
-        refs.push({ schema, table, alias })
+        refs.push({ schema, table, alias: validAlias })
       } else {
-        refs.push({ table: tablePart, alias })
+        refs.push({ table: tablePart, alias: validAlias })
       }
     })
   }
@@ -45,11 +71,14 @@ function extractTableReferences(sql: string): TableReference[] {
     const tablePart = match[1]
     const alias = match[2]
 
+    const validAlias =
+      alias && !SQL_KEYWORDS.has(alias.toLowerCase()) ? alias : undefined
+
     if (tablePart.includes(".")) {
       const [schema, table] = tablePart.split(".")
-      refs.push({ schema, table, alias })
+      refs.push({ schema, table, alias: validAlias })
     } else {
-      refs.push({ table: tablePart, alias })
+      refs.push({ table: tablePart, alias: validAlias })
     }
   }
 
@@ -133,17 +162,9 @@ function isInOnClause(sql: string, cursorOffset: number): boolean {
 export function registerSqlCompletionProvider(
   metadata: SchemaMetadata
 ): monaco.IDisposable {
-  console.log("[Monaco] Registering SQL completion provider with metadata:", {
-    schemas: metadata.schemas.length,
-    tables: metadata.tables.size,
-    columns: metadata.columns.size,
-  })
-
   return monaco.languages.registerCompletionItemProvider("sql", {
     triggerCharacters: [".", " ", "(", ","],
     provideCompletionItems: (model, position) => {
-      console.log("[Monaco] provideCompletionItems called")
-
       const word = model.getWordUntilPosition(position)
       const range: monaco.IRange = {
         startLineNumber: position.lineNumber,
@@ -156,8 +177,6 @@ export function registerSqlCompletionProvider(
       const cursorOffset = model.getOffsetAt(position)
       const lineContent = model.getLineContent(position.lineNumber)
       const textBeforeCursor = lineContent.substring(0, position.column - 1)
-
-      console.log("[Monaco] Context:", { lineContent, textBeforeCursor, word })
 
       const suggestions: monaco.languages.CompletionItem[] = []
 
@@ -352,8 +371,7 @@ export function registerSqlCompletionProvider(
         })
       }
 
-      console.log("[Monaco] Returning", suggestions.length, "suggestions")
-      return { suggestions }
+      return { suggestions, incomplete: false }
     },
   })
 }
@@ -416,7 +434,21 @@ export function getEditorOptions(): monaco.editor.IStandaloneEditorConstructionO
     folding: true,
     renderLineHighlight: "all",
     suggestOnTriggerCharacters: true,
-    quickSuggestions: true,
+    quickSuggestions: {
+      other: true,
+      comments: false,
+      strings: true,
+    },
+    suggest: {
+      showKeywords: true,
+      showSnippets: true,
+      showClasses: true,
+      showModules: true,
+      showFields: true,
+      filterGraceful: true,
+      snippetsPreventQuickSuggestions: false,
+    },
+    wordBasedSuggestions: "off",
     parameterHints: { enabled: true },
     formatOnPaste: false,
     formatOnType: false,

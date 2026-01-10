@@ -93,14 +93,8 @@
   }
 
   function updateCompletionProvider() {
-    console.log("[SqlEditor] updateCompletionProvider called")
     completionDisposable.value?.dispose()
     const metadata = buildSchemaMetadata()
-    console.log("[SqlEditor] Built metadata:", {
-      schemas: metadata.schemas.length,
-      tables: metadata.tables.size,
-      columns: metadata.columns.size,
-    })
     completionDisposable.value = registerSqlCompletionProvider(metadata)
   }
 
