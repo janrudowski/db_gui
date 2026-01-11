@@ -95,57 +95,9 @@
 }
 
 /* ============================================
-   DARK MODE (Default) - PrimeVue Overrides
+   DARK MODE - Theme aliases and PrimeVue overrides
    ============================================ */
 .dark-mode {
-  /* Surface colors */
-  --p-surface-0: var(--obsidian-800);
-  --p-surface-50: var(--obsidian-750);
-  --p-surface-100: var(--obsidian-700);
-  --p-surface-200: var(--obsidian-600);
-  --p-surface-300: var(--obsidian-500);
-  --p-surface-400: var(--obsidian-400);
-  --p-surface-500: var(--obsidian-300);
-  --p-surface-600: var(--obsidian-200);
-  --p-surface-700: var(--obsidian-100);
-  --p-surface-800: var(--obsidian-50);
-  --p-surface-900: #ffffff;
-  --p-surface-ground: var(--obsidian-900);
-  
-  /* Text colors */
-  --p-text-color: var(--obsidian-50);
-  --p-text-muted-color: var(--obsidian-300);
-  
-  /* Primary (Amber) */
-  --p-primary-50: #fffbeb;
-  --p-primary-100: #fef3c7;
-  --p-primary-200: #fde68a;
-  --p-primary-300: #fcd34d;
-  --p-primary-400: #fbbf24;
-  --p-primary-500: #f59e0b;
-  --p-primary-600: #d97706;
-  --p-primary-700: #b45309;
-  --p-primary-800: #92400e;
-  --p-primary-900: #78350f;
-  --p-primary-color: var(--amber-500);
-  --p-primary-contrast-color: var(--obsidian-950);
-  
-  /* Form colors */
-  --p-form-field-background: var(--obsidian-800);
-  --p-form-field-border-color: var(--obsidian-600);
-  --p-form-field-focus-border-color: var(--amber-500);
-  
-  /* Content area */
-  --p-content-background: var(--obsidian-800);
-  --p-content-border-color: var(--obsidian-600);
-  
-  /* Highlight */
-  --p-highlight-background: var(--amber-glow);
-  --p-highlight-color: var(--amber-400);
-  --p-highlight-focus-background: var(--amber-glow-strong);
-  --p-highlight-focus-color: var(--amber-300);
-
-  /* Theme-aware aliases for components */
   --theme-bg-primary: var(--obsidian-800);
   --theme-bg-secondary: var(--obsidian-850);
   --theme-bg-tertiary: var(--obsidian-900);
@@ -154,39 +106,23 @@
   --theme-text: var(--obsidian-50);
   --theme-text-muted: var(--obsidian-300);
   --theme-text-subtle: var(--obsidian-400);
+
+  --p-text-color: var(--obsidian-50);
+  --p-text-muted-color: var(--obsidian-300);
+  --p-surface-ground: var(--obsidian-900);
+  --p-surface-0: var(--obsidian-800);
+  --p-surface-50: var(--obsidian-750);
+  --p-surface-100: var(--obsidian-700);
+  --p-surface-200: var(--obsidian-600);
+  --p-surface-300: var(--obsidian-500);
+  --p-content-background: var(--obsidian-800);
+  --p-content-border-color: var(--obsidian-600);
 }
 
 /* ============================================
-   LIGHT MODE - PrimeVue Overrides
+   LIGHT MODE - Theme aliases for custom components
    ============================================ */
 :root:not(.dark-mode) {
-  --p-surface-ground: #f8f9fa;
-  --p-surface-0: #ffffff;
-  --p-surface-50: #fafafa;
-  --p-surface-100: #f4f4f5;
-  --p-surface-200: #e4e4e7;
-  --p-surface-300: #d4d4d8;
-  --p-surface-400: #a1a1aa;
-  --p-surface-500: #71717a;
-  --p-surface-600: #52525b;
-  --p-surface-700: #3f3f46;
-  --p-surface-800: #27272a;
-  --p-surface-900: #18181b;
-  
-  --p-text-color: #18181b;
-  --p-text-muted-color: #71717a;
-  
-  --p-primary-color: var(--amber-600);
-  --p-primary-contrast-color: #ffffff;
-  
-  --p-form-field-background: #ffffff;
-  --p-form-field-border-color: #e4e4e7;
-  --p-form-field-focus-border-color: var(--amber-500);
-  
-  --p-content-background: #ffffff;
-  --p-content-border-color: #e4e4e7;
-
-  /* Theme-aware aliases for components */
   --theme-bg-primary: #ffffff;
   --theme-bg-secondary: #fafafa;
   --theme-bg-tertiary: #f4f4f5;
@@ -428,14 +364,21 @@ body {
 }
 
 .dark-mode .p-datatable .p-datatable-thead > tr > th {
-  background: var(--obsidian-750);
-  border-bottom: var(--border-strong);
+  background: var(--obsidian-750) !important;
+  border-bottom: 1px solid var(--obsidian-600) !important;
+  border-right: 1px solid var(--obsidian-600) !important;
+  border-left: none !important;
+  border-top: none !important;
   font-weight: 600;
   text-transform: uppercase;
   font-size: 0.7rem;
   letter-spacing: 0.05em;
-  color: var(--obsidian-200);
+  color: var(--obsidian-200) !important;
   padding: var(--space-3) var(--space-4);
+}
+
+.dark-mode .p-datatable .p-datatable-thead > tr > th:last-child {
+  border-right: none !important;
 }
 
 .dark-mode .p-datatable .p-datatable-tbody > tr {
@@ -448,17 +391,35 @@ body {
 }
 
 .dark-mode .p-datatable .p-datatable-tbody > tr > td {
-  border-bottom: var(--border-subtle);
+  border-bottom: 1px solid var(--obsidian-700) !important;
+  border-right: 1px solid var(--obsidian-700) !important;
+  border-left: none !important;
+  border-top: none !important;
   padding: var(--space-2) var(--space-4);
   font-family: var(--font-mono);
   font-size: 0.8rem;
+  color: var(--obsidian-50) !important;
 }
 
-.dark-mode .p-datatable .p-datatable-tbody > tr.p-row-odd {
+.dark-mode .p-datatable .p-datatable-tbody > tr > td:last-child {
+  border-right: none !important;
+}
+
+.dark-mode .p-datatable .p-datatable-tbody > tr.p-row-odd,
+.dark-mode .p-datatable .p-datatable-tbody > tr:nth-child(odd) {
   background: var(--obsidian-850);
 }
 
-.dark-mode .p-datatable .p-datatable-tbody > tr.p-row-odd:hover {
+.dark-mode .p-datatable .p-datatable-tbody > tr.p-row-odd:hover,
+.dark-mode .p-datatable .p-datatable-tbody > tr:nth-child(odd):hover {
+  background: var(--obsidian-750);
+}
+
+.dark-mode .p-datatable .p-datatable-tbody > tr:nth-child(even) {
+  background: var(--obsidian-800);
+}
+
+.dark-mode .p-datatable .p-datatable-tbody > tr:nth-child(even):hover {
   background: var(--obsidian-750);
 }
 
@@ -469,6 +430,25 @@ body {
   border-radius: var(--radius-xl);
   box-shadow: var(--shadow-md);
   transition: all var(--transition-base);
+  color: var(--obsidian-50);
+}
+
+.dark-mode .p-card .p-card-body {
+  background: var(--obsidian-800);
+  color: var(--obsidian-50);
+}
+
+.dark-mode .p-card .p-card-content {
+  background: var(--obsidian-800);
+  color: var(--obsidian-50);
+}
+
+.dark-mode .p-card .p-card-title {
+  color: var(--obsidian-50);
+}
+
+.dark-mode .p-card .p-card-subtitle {
+  color: var(--obsidian-300);
 }
 
 .dark-mode .p-card:hover {
@@ -563,39 +543,100 @@ body {
 
 .dark-mode .p-tree .p-tree-node-label {
   font-size: 0.85rem;
+  color: var(--obsidian-50);
 }
 
-/* Context Menu */
+.dark-mode .p-tree .p-tree-toggler {
+  color: var(--obsidian-300);
+}
+
+/* Context Menu - Dark Mode */
 .dark-mode .p-contextmenu {
-  background: var(--obsidian-800);
-  border: var(--border-default);
+  background: var(--obsidian-800) !important;
+  border: 1px solid var(--obsidian-600) !important;
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-lg);
   padding: var(--space-2);
   min-width: 180px;
 }
 
+.dark-mode .p-contextmenu .p-contextmenu-root-list,
+.dark-mode .p-contextmenu .p-submenu-list,
+.dark-mode .p-contextmenu ul {
+  background: var(--obsidian-800) !important;
+  border: 1px solid var(--obsidian-600) !important;
+  border-radius: var(--radius-lg);
+  padding: var(--space-2) !important;
+}
+
 .dark-mode .p-contextmenu .p-menuitem {
   margin: 0;
 }
 
-.dark-mode .p-contextmenu .p-menuitem-link {
-  padding: var(--space-2) var(--space-3);
+.dark-mode .p-contextmenu .p-menuitem > .p-menuitem-content {
+  padding: var(--space-2) var(--space-3) !important;
   border-radius: var(--radius-md);
   transition: all var(--transition-fast);
+  background: transparent !important;
+  color: var(--obsidian-50) !important;
 }
 
-.dark-mode .p-contextmenu .p-menuitem-link:hover {
-  background: var(--obsidian-700);
+.dark-mode .p-contextmenu .p-menuitem > .p-menuitem-content:hover,
+.dark-mode .p-contextmenu .p-menuitem.p-focus > .p-menuitem-content {
+  background: var(--obsidian-700) !important;
 }
 
 .dark-mode .p-contextmenu .p-menuitem-icon {
-  color: var(--obsidian-300);
+  color: var(--obsidian-300) !important;
   margin-right: var(--space-3);
 }
 
 .dark-mode .p-contextmenu .p-menuitem-text {
   font-size: 0.85rem;
+  color: var(--obsidian-50) !important;
+}
+
+.dark-mode .p-contextmenu .p-submenu-icon {
+  color: var(--obsidian-300) !important;
+}
+
+.dark-mode .p-contextmenu .p-menuitem-link {
+  background: transparent !important;
+  color: var(--obsidian-50) !important;
+}
+
+.dark-mode .p-contextmenu .p-menuitem-link:hover {
+  background: var(--obsidian-700) !important;
+}
+
+/* Menu component - Dark Mode */
+.dark-mode .p-menu {
+  background: var(--obsidian-800) !important;
+  border: 1px solid var(--obsidian-600) !important;
+}
+
+.dark-mode .p-menu .p-menu-list,
+.dark-mode .p-menu .p-submenu-list,
+.dark-mode .p-menu ul {
+  background: var(--obsidian-800) !important;
+}
+
+.dark-mode .p-menu .p-menuitem > .p-menuitem-content {
+  background: transparent !important;
+  color: var(--obsidian-50) !important;
+}
+
+.dark-mode .p-menu .p-menuitem > .p-menuitem-content:hover,
+.dark-mode .p-menu .p-menuitem.p-focus > .p-menuitem-content {
+  background: var(--obsidian-700) !important;
+}
+
+.dark-mode .p-menu .p-menuitem-text {
+  color: var(--obsidian-50) !important;
+}
+
+.dark-mode .p-menu .p-menuitem-icon {
+  color: var(--obsidian-300) !important;
 }
 
 /* Tabs */
@@ -626,8 +667,17 @@ body {
 }
 
 .dark-mode .p-tabview .p-tabview-panels {
-  background: transparent;
+  background: var(--obsidian-800);
   padding: 0;
+}
+
+.dark-mode .p-tabview .p-tabview-panel {
+  background: var(--obsidian-800);
+  color: var(--obsidian-50);
+}
+
+.dark-mode .p-tabview-nav-container {
+  background: var(--obsidian-800);
 }
 
 /* Select/Dropdown */
@@ -693,6 +743,7 @@ body {
 .dark-mode .p-tooltip .p-tooltip-text {
   background: var(--obsidian-700);
   border: var(--border-subtle);
+  color: var(--obsidian-50);
 }
 
 /* Message */
@@ -716,6 +767,62 @@ body {
 /* Confirm Dialog */
 .dark-mode .p-confirm-dialog .p-confirm-dialog-icon {
   color: var(--warning);
+}
+
+/* Icons - make them visible on dark backgrounds */
+.dark-mode .pi {
+  color: var(--obsidian-200);
+}
+
+.dark-mode .p-button .pi {
+  color: inherit;
+}
+
+.dark-mode .p-button-text .pi,
+.dark-mode .p-button.p-button-text .pi {
+  color: var(--obsidian-200);
+}
+
+.dark-mode .p-button-text:hover .pi,
+.dark-mode .p-button.p-button-text:hover .pi {
+  color: var(--obsidian-50);
+}
+
+/* TabView panels in sidebar */
+.dark-mode .p-tabview {
+  background: var(--obsidian-800);
+}
+
+.dark-mode .p-tabview .p-tabview-ink-bar {
+  background: var(--amber-500);
+}
+
+.dark-mode .p-tabview-panel {
+  background: var(--obsidian-800);
+  color: var(--obsidian-50);
+}
+
+.dark-mode .p-tabpanel {
+  background: var(--obsidian-800);
+}
+
+/* Datatable action buttons */
+.dark-mode .p-datatable .p-button-text {
+  color: var(--obsidian-200);
+}
+
+.dark-mode .p-datatable .p-button-text:hover {
+  color: var(--obsidian-50);
+  background: var(--obsidian-700);
+}
+
+.dark-mode .p-datatable .p-button-danger.p-button-text {
+  color: var(--danger);
+}
+
+.dark-mode .p-datatable .p-button-danger.p-button-text:hover {
+  color: #f87171;
+  background: var(--danger-glow);
 }
 
 /* ============================================

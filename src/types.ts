@@ -129,11 +129,11 @@ export interface TabIcon {
 }
 
 export const TAB_ICONS: Record<TabType, TabIcon> = {
-  "data-grid": { icon: "pi pi-table", color: "var(--p-blue-500)" },
-  "sql-editor": { icon: "pi pi-code", color: "var(--p-green-500)" },
-  "table-creator": { icon: "pi pi-plus-circle", color: "var(--p-orange-500)" },
-  "table-designer": { icon: "pi pi-pencil", color: "var(--p-purple-500)" },
-  "schema-creator": { icon: "pi pi-database", color: "var(--p-cyan-500)" },
+  "data-grid": { icon: "pi pi-table", color: "var(--amber-500)" },
+  "sql-editor": { icon: "pi pi-code", color: "var(--amber-400)" },
+  "table-creator": { icon: "pi pi-plus-circle", color: "var(--amber-500)" },
+  "table-designer": { icon: "pi pi-pencil", color: "var(--amber-400)" },
+  "schema-creator": { icon: "pi pi-database", color: "var(--amber-500)" },
 }
 
 export interface Tab {

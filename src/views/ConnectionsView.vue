@@ -504,6 +504,7 @@
     overflow: hidden;
     background: var(--p-surface-0);
     animation: slideUp 0.3s ease backwards;
+    border-radius: var(--radius-lg);
   }
 
   .connection-card:nth-child(1) {

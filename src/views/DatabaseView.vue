@@ -24,7 +24,7 @@
   import { useToast } from "primevue/usetoast"
   import ToggleSwitch from "primevue/toggleswitch"
   import Tag from "primevue/tag"
-  import ThemeToggle from "../components/common/ThemeToggle.vue"
+  // import ThemeToggle from "../components/common/ThemeToggle.vue"
   import {
     generateSelect,
     generateInsert,
@@ -538,7 +538,7 @@
           @click="openNewQuery"
         />
         <Button
-          icon="pi pi-columns"
+          icon="pi pi-arrows-h"
           text
           rounded
           @click="
@@ -548,7 +548,7 @@
           :disabled="workspaceStore.panes.length >= 4"
         />
         <Button
-          icon="pi pi-arrows-h"
+          icon="pi pi-arrows-v"
           text
           rounded
           @click="
@@ -557,7 +557,7 @@
           v-tooltip.left="'Split Horizontal'"
           :disabled="workspaceStore.panes.length >= 4"
         />
-        <ThemeToggle />
+        <!-- <ThemeToggle /> -->
       </div>
     </div>
 

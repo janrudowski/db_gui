@@ -8,10 +8,8 @@ export const useThemeStore = defineStore("theme", () => {
     const saved = localStorage.getItem("theme")
     if (saved === "dark") {
       isDark.value = true
-    } else if (saved === "light") {
-      isDark.value = false
     } else {
-      isDark.value = true
+      isDark.value = false
     }
     applyTheme()
   }

@@ -848,13 +848,12 @@
                 v-tooltip="'Save changes'"
               />
               <Button
-                icon="pi pi-trash"
+                label="Delete"
                 text
-                rounded
                 severity="danger"
                 size="small"
+                class="delete-btn"
                 @click="deleteRow(data)"
-                v-tooltip="'Delete row'"
               />
             </template>
           </div>
@@ -914,6 +913,7 @@
     gap: var(--space-3);
     font-weight: 600;
     font-size: 0.9rem;
+    color: var(--p-text-color);
   }
 
   .table-info i {
@@ -1039,6 +1039,18 @@
   .row-actions {
     display: flex;
     gap: 2px;
+  }
+
+  .row-actions .delete-btn {
+    color: var(--danger) !important;
+    font-size: 0.75rem !important;
+    font-weight: 400 !important;
+    padding: 0.25rem 0.5rem !important;
+  }
+
+  .row-actions .delete-btn:hover {
+    color: #f87171 !important;
+    background: var(--danger-glow) !important;
   }
 
   :deep(.p-datatable-tbody tr:first-child.new-row) {
